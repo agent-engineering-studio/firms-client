@@ -58,13 +58,13 @@ async def download_archive(
     path = directory / archive_filename(product, year, country)
     if path.exists():
         return path
-    directory.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(f"{path.name}.part")
     try:
         async with client.stream("GET", archive_url(product, year, country)) as response:
             if response.status_code == 404:
                 return None
             response.raise_for_status()
+            directory.mkdir(parents=True, exist_ok=True)
             with partial.open("wb") as out:
                 async for chunk in response.aiter_bytes(_CHUNK):
                     out.write(chunk)

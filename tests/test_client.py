@@ -102,6 +102,10 @@ def test_an_explicit_directory_wins(
 
 
 def test_failures_leave_nothing_on_disk(data_dir: Path) -> None:
+    data_dir.rmdir()
+    assert run(lambda c: download_archive(c, VIIRS_SNPP, 2011, "Italy")) is None
+    assert not data_dir.exists()  # nothing to save, no directory
+    data_dir.mkdir()
     assert run(lambda c: download_archive(c, VIIRS_SNPP, 2011, "Italy")) is None
     with pytest.raises(FirmsError):
         run(lambda c: download_archive(c, VIIRS_SNPP, 1999, "Italy"))
@@ -109,7 +113,7 @@ def test_failures_leave_nothing_on_disk(data_dir: Path) -> None:
         run(lambda c: download_archive(c, VIIRS_SNPP, 1998, "Italy"))
     assert list(data_dir.iterdir()) == []
     run(lambda c: download_archive(c, VIIRS_SNPP, 2011, "Italy"))
-    assert len(CALLS) == 4  # a missing year is asked again
+    assert len(CALLS) == 5  # a missing year is asked again
 
 
 def test_default_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
