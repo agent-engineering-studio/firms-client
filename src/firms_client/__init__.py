@@ -2,7 +2,14 @@
 
 from importlib.metadata import version
 
-from firms_client.client import fetch_archive, fetch_archive_csv, fetch_area
+from firms_client.client import (
+    ENV_DATA_DIR,
+    default_directory,
+    download_archive,
+    fetch_archive,
+    fetch_archive_csv,
+    fetch_area,
+)
 from firms_client.errors import FirmsError
 from firms_client.hotspots import (
     ACTIVE_VOLCANO,
@@ -23,6 +30,7 @@ from firms_client.sources import (
     VIIRS_SNPP,
     ArchiveProduct,
     BBox,
+    archive_filename,
     archive_url,
     archive_years,
     area_url,
@@ -33,6 +41,7 @@ __version__ = version("firms-client")
 __all__ = [
     "ACTIVE_VOLCANO",
     "ARCHIVE_PRODUCTS",
+    "ENV_DATA_DIR",
     "MODIS",
     "NRT_SOURCES",
     "OFFSHORE",
@@ -45,10 +54,13 @@ __all__ = [
     "FirmsError",
     "Hotspot",
     "__version__",
+    "archive_filename",
     "archive_url",
     "archive_years",
     "area_url",
     "confidence_level",
+    "default_directory",
+    "download_archive",
     "fetch_archive",
     "fetch_archive_csv",
     "fetch_area",
