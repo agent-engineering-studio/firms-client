@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Yearly archives are saved in a persistent data directory and read from
+  disk afterwards: `download_archive`, `default_directory` (`FIRMS_DATA_DIR`,
+  else `$XDG_CACHE_HOME/firms-client` or `~/.cache/firms-client`) and a
+  `directory` argument on `fetch_archive` / `fetch_archive_csv`. Downloads
+  are streamed to a `.part` file and renamed when complete; a year not
+  published is not remembered. Same convention as egms-client.
+- `archive_filename`.
+- README rewritten with diagrams, charts drawn from the real 2025 Italian
+  archives (`docs/make_images.py`), recipes and an API overview.
+
 ## [0.1.0] - 2026-11-03
 
 ### Added

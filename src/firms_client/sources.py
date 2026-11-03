@@ -47,9 +47,14 @@ VIIRS_SNPP = ArchiveProduct(slug="viirs-snpp", first_year=2012)
 ARCHIVE_PRODUCTS = (MODIS, VIIRS_SNPP)
 
 
+def archive_filename(product: ArchiveProduct, year: int, country: str) -> str:
+    """The name FIRMS gives the yearly CSV: ``viirs-snpp_2025_Italy.csv``."""
+    return f"{product.slug}_{year}_{country}.csv"
+
+
 def archive_url(product: ArchiveProduct, year: int, country: str) -> str:
     """The yearly CSV of ``country`` (English name, as FIRMS writes it: ``Italy``)."""
-    return f"{ARCHIVE_BASE}/{product.slug}/{year}/{product.slug}_{year}_{country}.csv"
+    return f"{ARCHIVE_BASE}/{product.slug}/{year}/{archive_filename(product, year, country)}"
 
 
 def archive_years(product: ArchiveProduct, *, until: int) -> list[int]:

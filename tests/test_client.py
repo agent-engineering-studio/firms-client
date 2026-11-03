@@ -8,14 +8,34 @@ from typing import Any
 import httpx
 import pytest
 
-from firms_client import VIIRS_SNPP, FirmsError, fetch_archive, fetch_area
+from firms_client import (
+    ENV_DATA_DIR,
+    VIIRS_SNPP,
+    FirmsError,
+    default_directory,
+    download_archive,
+    fetch_archive,
+    fetch_area,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 VIIRS = (FIXTURES / "viirs-snpp_2025_Italy_sample.csv").read_bytes()
 
 
+CALLS: list[str] = []
+
+
+@pytest.fixture(autouse=True)
+def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Every test downloads into its own directory, never the user cache."""
+    monkeypatch.setenv(ENV_DATA_DIR, str(tmp_path))
+    CALLS.clear()
+    return tmp_path
+
+
 def handler(request: httpx.Request) -> httpx.Response:
     url = str(request.url)
+    CALLS.append(url)
     if url.endswith("viirs-snpp_2025_Italy.csv"):
         return httpx.Response(200, content=VIIRS)
     if url.endswith("viirs-snpp_2011_Italy.csv"):
@@ -61,6 +81,44 @@ def test_a_json_body_with_200_is_an_error_not_an_empty_year() -> None:
 def test_server_errors_propagate() -> None:
     with pytest.raises(httpx.HTTPStatusError):
         run(lambda c: fetch_archive(c, VIIRS_SNPP, 1998, "Italy"))
+
+
+def test_an_archive_is_downloaded_once(data_dir: Path) -> None:
+    path = run(lambda c: download_archive(c, VIIRS_SNPP, 2025, "Italy"))
+    assert path == data_dir / "viirs-snpp_2025_Italy.csv"
+    assert path.read_bytes() == VIIRS
+    rows = run(lambda c: fetch_archive(c, VIIRS_SNPP, 2025, "Italy"))
+    assert rows is not None and len(rows) == 24
+    assert len(CALLS) == 1
+
+
+def test_an_explicit_directory_wins(
+    data_dir: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    other = tmp_path_factory.mktemp("other") / "nested"
+    path = run(lambda c: download_archive(c, VIIRS_SNPP, 2025, "Italy", other))
+    assert path == other / "viirs-snpp_2025_Italy.csv"
+    assert list(data_dir.iterdir()) == []
+
+
+def test_failures_leave_nothing_on_disk(data_dir: Path) -> None:
+    assert run(lambda c: download_archive(c, VIIRS_SNPP, 2011, "Italy")) is None
+    with pytest.raises(FirmsError):
+        run(lambda c: download_archive(c, VIIRS_SNPP, 1999, "Italy"))
+    with pytest.raises(httpx.HTTPStatusError):
+        run(lambda c: download_archive(c, VIIRS_SNPP, 1998, "Italy"))
+    assert list(data_dir.iterdir()) == []
+    run(lambda c: download_archive(c, VIIRS_SNPP, 2011, "Italy"))
+    assert len(CALLS) == 4  # a missing year is asked again
+
+
+def test_default_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    assert default_directory() == tmp_path
+    monkeypatch.delenv(ENV_DATA_DIR)
+    monkeypatch.setenv("XDG_CACHE_HOME", "/srv/cache")
+    assert default_directory() == Path("/srv/cache/firms-client")
+    monkeypatch.delenv("XDG_CACHE_HOME")
+    assert default_directory() == Path("~/.cache/firms-client").expanduser()
 
 
 def test_area_api() -> None:
