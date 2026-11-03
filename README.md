@@ -20,7 +20,7 @@ queries the **near-real-time area API**, and does the parsing that tells a
 
 ```python
 rows = await fetch_archive(client, VIIRS_SNPP, 2025, "Italy")  # 23,349 detections, no key
-fires = select(rows)                                           # 14,880 vegetation fires
+fires = select(rows)  # 14,880 vegetation fires
 ```
 
 One dependency: `httpx`.
