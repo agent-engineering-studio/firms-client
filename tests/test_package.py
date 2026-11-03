@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import package_name
+import firms_client
 
 
 def test_version_is_exposed() -> None:
-    assert package_name.__version__
+    assert firms_client.__version__
