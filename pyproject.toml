@@ -1,6 +1,6 @@
 [project]
 name = "firms-client"
-version = "0.2.0"
+version = "0.3.0"
 description = "Client for NASA FIRMS active fires: open per-country archives, NRT area API, detection types"
 readme = "README.md"
 keywords = ["firms", "nasa", "wildfire", "active fire", "hotspot", "modis", "viirs", "remote sensing"]
@@ -24,6 +24,9 @@ classifiers = [
 dependencies = [
     "httpx>=0.27",
 ]
+
+[project.scripts]
+firms = "firms_client.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/agent-engineering-studio/firms-client"
