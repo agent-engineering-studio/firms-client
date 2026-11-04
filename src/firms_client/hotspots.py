@@ -57,7 +57,14 @@ _RANK: dict[ConfidenceLevel, int] = {"low": 0, "nominal": 1, "high": 2}
 
 @dataclass(frozen=True, slots=True)
 class Hotspot:
-    """One detection. ``acq_time`` is UTC ``HHMM`` as an integer (``126`` = 01:26)."""
+    """One detection. ``acq_time`` is UTC ``HHMM`` as an integer (``126`` = 01:26).
+
+    The fields after ``detection_type`` are the rest of the CSV, for
+    analysis and models: the 11 µm brightness (``bright_ti5`` for VIIRS,
+    ``bright_t31`` for MODIS), the pixel size along scan and track (km) and
+    the processing version (``2``, ``2.0NRT``, ``61.03``). They default to
+    ``None``, so a ``Hotspot`` built by hand needs only the first eleven.
+    """
 
     latitude: float
     longitude: float
@@ -70,6 +77,10 @@ class Hotspot:
     satellite: str | None
     instrument: str | None
     detection_type: int | None
+    brightness_t5_k: float | None = None
+    scan_km: float | None = None
+    track_km: float | None = None
+    version: str | None = None
 
     @property
     def is_vegetation_fire(self) -> bool | None:
@@ -106,6 +117,10 @@ def parse_csv(text: str) -> list[Hotspot]:
                 satellite=row.get("satellite") or None,
                 instrument=row.get("instrument") or None,
                 detection_type=int(kind) if kind is not None else None,
+                brightness_t5_k=_float(row.get("bright_ti5")) or _float(row.get("bright_t31")),
+                scan_km=_float(row.get("scan")),
+                track_km=_float(row.get("track")),
+                version=row.get("version") or None,
             )
         )
     return out

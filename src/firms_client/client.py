@@ -7,6 +7,9 @@ Yearly archives are downloaded once into a data directory and read from
 there afterwards: they are static, and a national VIIRS year is a few MB.
 Downloads are streamed to a ``.part`` file and renamed when complete, so a
 file that exists is whole. The area API is near-real-time and never cached.
+
+Every fetch takes an optional :class:`~firms_client.retry.RetryPolicy`;
+without one, a request is made once.
 """
 
 from __future__ import annotations
@@ -18,7 +21,15 @@ from typing import TYPE_CHECKING
 
 from firms_client.errors import FirmsError
 from firms_client.hotspots import Hotspot, is_hotspot_csv, parse_csv
-from firms_client.sources import ArchiveProduct, BBox, archive_filename, archive_url, area_url
+from firms_client.retry import RetryableStatusError, RetryPolicy, retryable, with_retries
+from firms_client.sources import (
+    ArchiveProduct,
+    BBox,
+    archive_filename,
+    archive_url,
+    area_url,
+    area_windows,
+)
 
 if TYPE_CHECKING:
     import httpx
@@ -47,6 +58,8 @@ async def download_archive(
     year: int,
     country: str,
     directory: Path | None = None,
+    *,
+    retry: RetryPolicy | None = None,
 ) -> Path | None:
     """The yearly CSV in ``directory``, downloaded if missing; ``None`` when not published.
 
@@ -59,15 +72,24 @@ async def download_archive(
     if path.exists():
         return path
     partial = path.with_name(f"{path.name}.part")
-    try:
-        async with client.stream("GET", archive_url(product, year, country)) as response:
+    url = archive_url(product, year, country)
+
+    async def attempt(final: bool) -> bool:
+        async with client.stream("GET", url) as response:
             if response.status_code == 404:
-                return None
+                return False
+            if retryable(retry, response, final):
+                raise RetryableStatusError(response)
             response.raise_for_status()
             directory.mkdir(parents=True, exist_ok=True)
             with partial.open("wb") as out:
                 async for chunk in response.aiter_bytes(_CHUNK):
                     out.write(chunk)
+        return True
+
+    try:
+        if not await with_retries(retry, attempt):
+            return None
         with partial.open(encoding="utf-8", errors="replace") as part:
             head = part.read(400)
         if not is_hotspot_csv(head):
@@ -84,9 +106,11 @@ async def fetch_archive_csv(
     year: int,
     country: str,
     directory: Path | None = None,
+    *,
+    retry: RetryPolicy | None = None,
 ) -> str | None:
     """The raw yearly CSV, via :func:`download_archive`; ``None`` when not published."""
-    path = await download_archive(client, product, year, country, directory)
+    path = await download_archive(client, product, year, country, directory, retry=retry)
     return path.read_text(encoding="utf-8") if path is not None else None
 
 
@@ -96,9 +120,11 @@ async def fetch_archive(
     year: int,
     country: str,
     directory: Path | None = None,
+    *,
+    retry: RetryPolicy | None = None,
 ) -> list[Hotspot] | None:
     """One year of a country's archive, parsed; ``None`` when not published."""
-    text = await fetch_archive_csv(client, product, year, country, directory)
+    text = await fetch_archive_csv(client, product, year, country, directory, retry=retry)
     return parse_csv(text) if text is not None else None
 
 
@@ -110,9 +136,22 @@ async def fetch_area(
     *,
     days: int = 1,
     on_date: date | None = None,
+    retry: RetryPolicy | None = None,
 ) -> list[Hotspot]:
-    """Detections of ``source`` over ``bbox``. A bad key or source raises :class:`FirmsError`."""
-    response = await client.get(area_url(map_key, source, bbox, days=days, on_date=on_date))
+    """Detections of ``source`` over ``bbox``. A bad key or source raises :class:`FirmsError`.
+
+    Without ``on_date``, the last ``days`` days up to today; with it, the
+    ``days`` days starting on ``on_date`` (1 to 5).
+    """
+    url = area_url(map_key, source, bbox, days=days, on_date=on_date)
+
+    async def attempt(final: bool) -> httpx.Response:
+        response = await client.get(url)
+        if retryable(retry, response, final):
+            raise RetryableStatusError(response)
+        return response
+
+    response = await with_retries(retry, attempt)
     if response.status_code != 200 or not is_hotspot_csv(response.text):
         if response.status_code == 200 and not response.text.strip():
             return []
@@ -120,3 +159,27 @@ async def fetch_area(
             f"FIRMS area API (HTTP {response.status_code}): {response.text[:200].strip()}"
         )
     return parse_csv(response.text)
+
+
+async def fetch_area_range(
+    client: httpx.AsyncClient,
+    map_key: str,
+    source: str,
+    bbox: BBox,
+    start: date,
+    end: date,
+    *,
+    retry: RetryPolicy | None = None,
+) -> list[Hotspot]:
+    """Detections from ``start`` to ``end`` (both included), in 5-day requests.
+
+    The windows are fetched one after the other, to stay gentle with the
+    MAP_KEY's transaction limit; pass a ``retry`` policy for long ranges.
+    Use an ``*_SP`` source for anything older than a few months.
+    """
+    out: list[Hotspot] = []
+    for on_date, days in area_windows(start, end):
+        out += await fetch_area(
+            client, map_key, source, bbox, days=days, on_date=on_date, retry=retry
+        )
+    return out

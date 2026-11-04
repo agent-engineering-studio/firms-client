@@ -29,6 +29,8 @@ def test_modis_rows_parse_with_percentage_confidence_and_brightness() -> None:
     assert first.brightness_k == 308.7
     assert first.instrument == "MODIS"
     assert first.confidence is not None and first.confidence.isdigit()
+    assert (first.brightness_t5_k, first.scan_km, first.track_km) == (294.1, 1.2, 1.1)
+    assert first.version == "61.03"
 
 
 def test_viirs_rows_use_bright_ti4_and_letters() -> None:
@@ -37,6 +39,19 @@ def test_viirs_rows_use_bright_ti4_and_letters() -> None:
     assert {r.confidence for r in rows} == {"l", "n", "h"}
     assert all(r.brightness_k for r in rows)
     assert {r.detection_type for r in rows} == {0, 1, 2, 3}
+    first = rows[0]
+    assert (first.brightness_t5_k, first.scan_km, first.track_km) == (274.86, 0.4, 0.37)
+    assert first.version == "2"
+
+
+def test_an_nrt_row_without_type_or_extras_still_parses() -> None:
+    text = (
+        "latitude,longitude,bright_ti4,acq_date,acq_time,confidence,frp,daynight\n"
+        "40.52,17.21,331.2,2026-08-01,0126,n,12.4,N\n"
+    )
+    (row,) = parse_csv(text)
+    assert row.detection_type is None and row.is_vegetation_fire is None
+    assert (row.brightness_t5_k, row.scan_km, row.track_km, row.version) == (None,) * 4
 
 
 def test_the_type_column_separates_fires_from_industry() -> None:

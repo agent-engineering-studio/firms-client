@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from firms_client import (
     download_archive,
     fetch_archive,
     fetch_area,
+    fetch_area_range,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -130,3 +132,17 @@ def test_area_api() -> None:
     assert run(lambda c: fetch_area(c, "QUIET", "VIIRS_SNPP_NRT", BBOX)) == []
     with pytest.raises(FirmsError, match=r"HTTP 400\): Invalid MAP_KEY"):
         run(lambda c: fetch_area(c, "BADKEY", "VIIRS_SNPP_NRT", BBOX))
+
+
+def test_a_range_is_fetched_in_forward_windows() -> None:
+    rows = run(
+        lambda c: fetch_area_range(
+            c, "KEY", "VIIRS_SNPP_SP", BBOX, date(2025, 7, 1), date(2025, 7, 12)
+        )
+    )
+    assert len(rows) == 3 * 24
+    assert [url.rsplit("/", 2)[1:] for url in CALLS] == [
+        ["5", "2025-07-01"],
+        ["5", "2025-07-06"],
+        ["2", "2025-07-11"],
+    ]

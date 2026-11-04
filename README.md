@@ -155,9 +155,52 @@ rows = await fetch_area(client, MAP_KEY, "VIIRS_SNPP_NRT", ITALY, days=3)
 fires = select(rows, min_frp_mw=1.0)
 ```
 
-`days` goes from 1 to 5 (the API's limit), `on_date=date(2026, 8, 1)` moves the
-window back.
-The area API is near-real-time and is never cached.
+`days` goes from 1 to 5 (the API's limit). Without a date it is the last
+`days` days up to today; `on_date=date(2026, 8, 1)` asks for the `days` days
+**starting** on that date. For a longer range, `fetch_area_range` splits it
+into 5-day requests:
+
+```python
+from datetime import date
+
+from firms_client import RetryPolicy, fetch_area_range
+
+july = await fetch_area_range(
+    client,
+    MAP_KEY,
+    "VIIRS_SNPP_SP",
+    ITALY,
+    date(2025, 7, 1),
+    date(2025, 7, 31),
+    retry=RetryPolicy(),  # 429, 5xx and dropped connections, with backoff
+)
+```
+
+The area API is near-real-time and is never cached. Its rows carry **no
+`type`**, so `select()` cannot drop industrial sources from them: see
+[the roadmap](https://agent-engineering-studio.github.io/firms-client/roadmap.html#gap).
+
+### 4. Or from a shell
+
+```bash
+firms archive Italy 2025                      # a summary, by type
+firms archive Italy 2025 --fires --format geojson > fires.geojson
+firms archive Greece 2024 --product modis --format csv
+FIRMS_MAP_KEY=… firms area --bbox 6,36,19,47.6 --days 3 --fires
+FIRMS_MAP_KEY=… firms area --bbox 6,36,19,47.6 --source VIIRS_SNPP_SP --from 2025-07-01 --to 2025-07-31
+```
+
+```
+23349 detections
+  vegetation fire: 17533
+  active volcano: 633
+  static land source: 4277
+  offshore: 906
+from 2025-01-01 to 2025-12-31, busiest day 2025-07-22
+FRP: max 420.84 MW, total 148141 MW
+```
+
+The command line retries on 429, 5xx and dropped connections.
 
 ---
 
@@ -307,6 +350,9 @@ dataclass:
 | `daynight` | `str \| None` | `"D"` | day or night overpass |
 | `satellite`, `instrument` | `str \| None` | `"N"`, `"VIIRS"` | |
 | `detection_type` | `int \| None` | `0` | the FIRMS `type`; `is_vegetation_fire` reads it |
+| `brightness_t5_k` | `float \| None` | `274.9` | 11 µm brightness, K (`bright_ti5` / `bright_t31`) |
+| `scan_km`, `track_km` | `float \| None` | `0.4`, `0.37` | pixel size along scan and track |
+| `version` | `str \| None` | `"2"`, `"2.0NRT"` | collection and processing |
 
 Rows without coordinates, date or a valid time are skipped.
 
@@ -346,7 +392,7 @@ min_confidence_pct=None, min_frp_mw=0.0)`:
 | an error page with HTTP 200 instead of a CSV | `FirmsError` |
 | bad MAP_KEY or source (HTTP 400, plain text `Invalid MAP_KEY.`) | `FirmsError` |
 | area API, nothing detected (empty body) | `[]` |
-| 5xx, timeouts, network errors | `httpx` exceptions, untouched: retries are your client's job |
+| 5xx, timeouts, network errors | `httpx` exceptions, untouched, unless you pass `retry=RetryPolicy()` |
 
 ---
 
@@ -411,21 +457,10 @@ plt.show()
 ```python
 import json
 
-features = [
-    {
-        "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": [h.longitude, h.latitude]},
-        "properties": {
-            "date": h.acq_date.isoformat(),
-            "time": f"{h.acq_time:04d}",
-            "frp_mw": h.frp_mw,
-            "confidence": h.confidence,
-            "type": h.detection_type,
-        },
-    }
-    for h in select(rows)
-]
-Path("fires.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": features}))
+from firms_client import to_csv, to_geojson
+
+Path("fires.geojson").write_text(json.dumps(to_geojson(select(rows))))
+Path("fires.csv").write_text(to_csv(select(rows)))  # every field, one row per hotspot
 ```
 
 ### A wildfire trigger
@@ -468,6 +503,8 @@ rows = parse_csv(requests.get(url, timeout=120).text)
 | confidence is one format | MODIS writes a 0-100 percentage, VIIRS `l`/`n`/`h` or `low`/`nominal`/`high` |
 | a missing year is an empty file | it is a 404 with a JSON body; an error with status 200 is caught too |
 | a bad MAP_KEY returns JSON | it is HTTP **400** with plain text `Invalid MAP_KEY.` |
+| the date in the area API ends the window | it **starts** it: `DATE .. DATE + days - 1`; without a date, the window ends today |
+| near-real-time rows say what burned | the area API has **no `type`** column: a steelworks looks like a fire |
 | no hotspot means no fire | FIRMS is presence-only: clouds, smoke and the overpass time hide fires |
 
 All checked against the live service on 3 November 2026.
@@ -481,14 +518,17 @@ All checked against the live service on 3 November 2026.
 | `fetch_archive(client, product, year, country, directory=None)` | async | one year of a country, parsed; `None` if not published |
 | `fetch_archive_csv(…)` | async | the same, as raw CSV text |
 | `download_archive(…)` | async | the CSV's `Path` in the data directory, downloaded if missing |
-| `fetch_area(client, map_key, source, bbox, *, days=1, on_date=None)` | async | near-real-time detections over a bbox |
+| `fetch_area(client, map_key, source, bbox, *, days=1, on_date=None, retry=None)` | async | detections over a bbox, 1-5 days |
+| `fetch_area_range(client, map_key, source, bbox, start, end, *, retry=None)` | async | any date range, in 5-day requests |
+| `RetryPolicy(attempts=3, backoff_s=1.0, max_backoff_s=30.0, …)` | type | opt-in retries for every fetch (`retry=`) |
+| `to_geojson(hotspots)`, `to_csv(hotspots)` | pure | a GeoJSON `FeatureCollection`, a CSV of every field |
 | `select(hotspots, *, vegetation_only, min_confidence, min_confidence_pct, min_frp_mw)` | pure | keep what looks like a fire |
 | `parse_csv(text)` | pure | CSV text → `list[Hotspot]` |
 | `confidence_level(raw)` | pure | MODIS % or VIIRS level → `"low"` / `"nominal"` / `"high"` |
 | `is_hotspot_csv(text)` | pure | is this a hotspot CSV, or an error page? |
-| `archive_url`, `archive_filename`, `area_url`, `archive_years` | pure | URLs, file names, year ranges |
+| `archive_url`, `archive_filename`, `area_url`, `area_windows`, `archive_years` | pure | URLs, file names, 5-day windows, year ranges |
 | `default_directory()` | pure | `FIRMS_DATA_DIR`, else `~/.cache/firms-client` |
-| `MODIS`, `VIIRS_SNPP`, `ARCHIVE_PRODUCTS`, `NRT_SOURCES` | constants | products and sources |
+| `MODIS`, `VIIRS_SNPP`, `ARCHIVE_PRODUCTS`, `NRT_SOURCES`, `SP_SOURCES`, `MAX_AREA_DAYS` | constants | products and sources |
 | `VEGETATION_FIRE`, `ACTIVE_VOLCANO`, `STATIC_LAND_SOURCE`, `OFFSHORE` | constants | the `type` values |
 | `Hotspot`, `ArchiveProduct`, `BBox`, `ConfidenceLevel` | types | |
 | `FirmsError` | exception | FIRMS answered, but not with a hotspot CSV |
@@ -516,11 +556,9 @@ the 2025 Italian archives.
 
 - 🌍 **More archives**: per-country files for other products, if FIRMS
   publishes them; a list of the country names FIRMS accepts.
-- 🗺️ **Area API over history**: the `*_SP` sources and date ranges longer
-  than 5 days, split into windows.
-- 🔁 **Retries** for 429/5xx, as in egms-client, opt-in.
-- 🖥️ **A command line**: `firms archive Italy 2025`, `firms area --bbox …`.
 - 🧭 **Clustering** neighbouring hotspots into fire events.
+- 🏭 **A static-source mask** learned from the archives, for the
+  near-real-time rows that have no `type`.
 - 📓 **Notebooks**: a national fire history, a burnt-area comparison.
 
 If you use firms-client in a project or a paper, open an issue and tell us:
