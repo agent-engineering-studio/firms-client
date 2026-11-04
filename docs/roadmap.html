@@ -32,7 +32,7 @@
       an LLM explaining numbers that code has already computed.
     </p>
     <div class="callout">
-      <p><strong>Shipped:</strong> the foundations (v0.3), the AI-ready layer (v0.4) and the static-source mask and anomalies (v0.5). Everything marked <span class="tag hi">✓ shipped</span> below is on <code>main</code>, with tests and measured on the real Italian archives. Next: grounded alert bulletins.</p>
+      <p><strong>Shipped:</strong> the foundations (v0.3), the AI-ready layer (v0.4) and the static-source mask and anomalies (v0.5). Everything marked <span class="tag hi">✓ shipped</span> below is on <code>main</code>, with tests and measured on the real Italian archives. Also shipped: grounded alert bulletins (v1.0). Next: crop burning vs wildfire.</p>
     </div>
     <ul class="toc">
       <li><a href="#principles">Principles</a></li>
@@ -63,7 +63,7 @@
       <div class="phase"><span class="v">v0.3</span><h3>Foundations</h3><ul><li>✅ opt-in retries for 429 / 5xx</li><li>✅ area API over long date ranges</li><li>✅ keep every CSV column</li><li>✅ <code>firms</code> command line</li></ul></div>
       <div class="phase"><span class="v">v0.4</span><h3>AI-ready</h3><ul><li>✅ <code>summarize()</code>: compact stats for LLMs</li><li>✅ fire events (spatio-temporal clusters)</li><li>✅ <code>firms-mcp</code> server</li><li>✅ <code>llms.txt</code> (on this site)</li></ul></div>
       <div class="phase"><span class="v">v0.5</span><h3>Learned filters</h3><ul><li>✅ static-source mask from the archives</li><li>✅ anomaly vs the historical baseline</li><li><code>type</code> classifier for new sources</li></ul></div>
-      <div class="phase"><span class="v">v1.0</span><h3>Answers</h3><ul><li>grounded alert bulletins</li><li>crop burning vs wildfire, with land cover</li><li>training sets for fire-risk models</li></ul></div>
+      <div class="phase"><span class="v">v1.0</span><h3>Answers</h3><ul><li>✅ grounded alert bulletins</li><li>crop burning vs wildfire, with land cover</li><li>training sets for fire-risk models</li></ul></div>
     </div>
   </section>
 
@@ -190,13 +190,16 @@ fires = select(mask.label(live))  <span class="c"># NRT rows get the type of the
 
     <div class="feature" id="bulletins">
       <h3>📰 Grounded alert bulletins</h3>
-      <div class="meta"><span class="tag ai">LLM</span><span class="tag">v1.0</span><span class="tag">medium</span><span class="tag">example, not core</span></div>
+      <div class="meta"><span class="tag ai">LLM</span><span class="tag">v1.0</span><span class="tag">medium</span><span class="tag hi">✓ shipped</span></div>
       <p>The wildfire trigger, one step further: when a new event appears, an LLM writes a short bulletin for a civil-protection team, in their language, from structured inputs only: the event, the anomaly score, the static-mask verdict, nearby places from a gazetteer.</p>
       <ul>
         <li>structured output (JSON schema), with every number copied from the input and checked after generation;</li>
         <li>human in the loop: a draft for an operator, never an automatic public alert;</li>
-        <li>shipped as a recipe and a notebook, provider-agnostic, with Claude as the reference.</li>
+        <li>provider-agnostic: a writer is any async callable; <code>ClaudeWriter</code> (extra <code>[claude]</code>) is the reference.</li>
       </ul>
+<pre><code>facts = bulletin_facts(event, places=gazetteer, mask=mask, anomaly=season, region=<span class="s">"Sicily"</span>)
+draft = <span class="k">await</span> draft_bulletin(facts, ClaudeWriter(), language=<span class="s">"it"</span>)
+draft.grounded  <span class="c"># False if a number or a place is not in the facts: draft.problems says which</span></code></pre>
     </div>
 
     <div class="feature" id="landcover">
@@ -233,13 +236,13 @@ fires = select(mask.label(live))  <span class="c"># NRT rows get the type of the
           <tr><td><a href="#retries">Retries</a>, <a href="#windows">windows</a>, <a href="#columns">columns</a></td><td>★★</td><td>small</td><td>—</td><td>core ✅</td></tr>
           <tr><td><a href="#cli">CLI</a></td><td>★★</td><td>medium</td><td>—</td><td>core (script) ✅</td></tr>
           <tr><td><a href="#classifier"><code>type</code> classifier</a></td><td>★★</td><td>large</td><td>columns, mask</td><td><code>[ml]</code> extra</td></tr>
-          <tr><td><a href="#bulletins">Bulletins</a></td><td>★★</td><td>medium</td><td>events, mask, anomaly</td><td>recipe / notebook</td></tr>
+          <tr><td><a href="#bulletins">Bulletins</a></td><td>★★</td><td>medium</td><td>events, mask, anomaly</td><td>core + extra <code>[claude]</code> ✅</td></tr>
           <tr><td><a href="#training">Training sets</a></td><td>★★</td><td>medium</td><td>mask, events</td><td><code>[ml]</code> extra</td></tr>
           <tr><td><a href="#landcover">Crop vs wildfire</a></td><td>★</td><td>large</td><td>events, land cover</td><td><code>[ml]</code> extra</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Done in this order: <strong>columns → events → static mask → summarize → firms-mcp</strong>. firms-client now answers the question it was built for, "is something burning in my area right now?", without the steelworks, and an agent can ask it in plain words. Next: <strong>bulletins → crop vs wildfire → training sets → classifier</strong>.</p>
+    <p>Done in this order: <strong>columns → events → static mask → summarize → firms-mcp</strong>. firms-client now answers the question it was built for, "is something burning in my area right now?", without the steelworks, and an agent can ask it in plain words. Then the bulletins. Next: <strong>crop vs wildfire → training sets → classifier</strong>.</p>
   </section>
 
   <section id="risks">
