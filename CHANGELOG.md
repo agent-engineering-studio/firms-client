@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
 ### Added
 
 - Grounded alert bulletins: `bulletin_facts` (event, nearest places from
@@ -15,7 +17,6 @@ All notable changes to this project are documented here. The format follows
   every place in the facts), `Bulletin` (always a draft), `Place`,
   `nearest_places`, and `ClaudeWriter` (extra `firms-client[claude]`,
   `anthropic>=2.4`: Claude Opus 5.5, `fallbacks="default"`).
-
 - Static-source mask for rows without `type` (the area API):
   `build_static_mask`, `fetch_static_mask` (built from a country's archives
   once, cached as JSON in the data directory), `StaticMask.label` /
@@ -49,11 +50,6 @@ All notable changes to this project are documented here. The format follows
   for LLM prompts. `firms … --format json` prints it.
 - README: lava flows outside the volcano mask are `type` 0 (Etna, February
   2025).
-
-## [0.3.0] - 2026-11-04
-
-### Added
-
 - `firms` command line: `firms archive COUNTRY YEAR`, `firms area --bbox …`,
   with `--fires`, `--min-frp` and `--format csv | geojson | summary`; the
   MAP_KEY from `--key` or `FIRMS_MAP_KEY`; retries on.
