@@ -595,6 +595,55 @@ a.describe()  # '2017: 7,552, the highest of 14 years (robust z +3.8)'
 From a shell: `firms anomaly Italy 2017 --month 7`, or
 `firms anomaly Italy 2021 --bbox 12.3,36.6,15.7,38.35` for Sicily.
 
+### Crop burning or wildfire?
+
+`type` 0 says *vegetation*, not which: stubble burnt after the harvest and
+a forest fire look the same to the satellite. The land cover under an
+event tells them apart. With `pip install 'firms-client[landcover]'`,
+`WorldCover` reads [ESA WorldCover](https://esa-worldcover.org/) 10 m
+(open data, no account) straight from its public bucket, fetching only the
+blocks under the hotspots:
+
+```python
+from firms_client import WorldCover, classify_burning, cluster
+
+with WorldCover() as land:
+    for event in cluster(select(rows))[:20]:
+        verdict = classify_burning(event, land)
+        print(event.start, verdict.kind, verdict.reason)
+# 2025-08-09 wildfire natural vegetation 100%
+# 2025-07-19 crop_burning cropland 92%, natural vegetation 8%, 11 hotspots over 1 day
+```
+
+| `kind` | When |
+|---|---|
+| `wildfire` | natural vegetation (trees, shrubs, grassland, wetland) ≥ 50% |
+| `crop_burning` | cropland ≥ 70%, natural ≤ 15%, at most 15 hotspots over 2 days |
+| `cropland_fire` | the same land, but a larger or longer event |
+| `other` | built-up or bare ground ≥ 50% |
+| `mixed`, `unknown` | none of the above; no land cover (the sea) |
+
+The thresholds are in `BurningRules`. It is a heuristic that says what the
+map says under the pixels, not a validated classifier.
+
+On Italy 2025 ([`docs/landcover_italy.py`](./docs/landcover_italy.py), 129 s
+for 400 events read from the bucket):
+
+| VIIRS events, Italy 2025 | wildfire | mixed | crop burning | cropland fire | other |
+|---|---:|---:|---:|---:|---:|
+| the 100 largest | 76% | 14% | 9% | 1% | – |
+| 300 at random | 48% | 23% | 13% | – | 16% |
+
+Crop burning comes from June to October, after the harvest; the clearest
+cases are on the Apulian plain, on 92-96% cropland. One limit shows up
+too: the Etna lava flow of February 2025 reads as `wildfire`, since the map
+sees the vegetation on the volcano's flanks. Use the land cover together
+with the static-source mask, which catches it.
+
+Reading from the bucket costs about half a second per new 1024-pixel
+block: fine for alerts, slow for a country's whole year. For bulk work,
+copy the tiles you need and pass their directory: `WorldCover(source="…")`.
+
 ### Grounded alert bulletins
 
 When the trigger finds a new event, an LLM can draft the few lines an
@@ -698,9 +747,11 @@ All checked against the live service on 3 November 2026.
 | `build_static_mask(hotspots, rules)`, `StaticMask.label/verdict/save/load`, `MaskRules` | pure | the same from rows you have |
 | `season_anomaly(client, country, year, *, month, bbox, product)` | async | a year or month against the other archive years |
 | `anomaly(series, year)` → `Anomaly` | pure | the same for any `{year: value}` series |
-| `bulletin_facts(event, *, places, mask, anomaly, region)`, `Place`, `nearest_places` | pure | the facts a bulletin may use |
+| `bulletin_facts(event, *, places, mask, anomaly, burning, region)`, `Place`, `nearest_places` | pure | the facts a bulletin may use |
 | `draft_bulletin(facts, writer, *, language, retries)` → `Bulletin`, `check_grounding` | async / pure | an LLM draft, checked against the facts |
 | `ClaudeWriter(client=None, *, model="claude-opus-5-5", effort="medium")` | extra `[claude]` | a writer on the Anthropic API |
+| `classify_burning(event, land, rules)` → `BurningVerdict`, `event_land_cover`, `BurningRules` | pure | crop burning, wildfire or other, by land cover |
+| `WorldCover(source=…, year=2021)` | extra `[landcover]` | ESA WorldCover 10 m, read in place |
 | `to_geojson(hotspots)`, `to_csv(hotspots)` | pure | a GeoJSON `FeatureCollection`, a CSV of every field |
 | `select(hotspots, *, vegetation_only, min_confidence, min_confidence_pct, min_frp_mw)` | pure | keep what looks like a fire |
 | `parse_csv(text)` | pure | CSV text → `list[Hotspot]` |
@@ -729,7 +780,7 @@ Issues and pull requests are welcome; see [CONTRIBUTING.md](./CONTRIBUTING.md).
 git clone https://github.com/agent-engineering-studio/firms-client
 cd firms-client
 uv sync
-uv sync --all-extras  # the mcp extra too, for its tests
+uv sync --all-extras  # the mcp, claude and landcover extras too, for their tests
 make check   # ruff, mypy --strict, pytest with coverage: the same gate as CI
 ```
 

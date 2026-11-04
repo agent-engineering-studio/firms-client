@@ -216,3 +216,18 @@ def test_claude_writer_builds_its_own_client(monkeypatch: pytest.MonkeyPatch) ->
     assert (
         isinstance(writer.client, anthropic.AsyncAnthropic) and writer.model == "claude-sonnet-5-5"
     )
+
+
+def test_land_cover_goes_into_the_facts() -> None:
+    from firms_client import classify_burning
+
+    class Forest:
+        def shares(self, latitude: float, longitude: float, radius_m: float) -> dict[int, float]:
+            return {10: 0.8, 30: 0.2}
+
+    verdict = classify_burning(event(), Forest())
+    with_land = bulletin_facts(event(), burning=verdict)
+    assert with_land["land_cover"]["kind"] == "wildfire"
+    assert with_land["land_cover"]["land_cover"] == {"tree_cover": 0.8, "grassland": 0.2}
+    assert any("land-cover map" in c for c in with_land["caveats"])
+    assert bulletin_facts(event())["land_cover"] is None

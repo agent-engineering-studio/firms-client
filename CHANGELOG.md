@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Crop burning or wildfire, by land cover: `classify_burning` (`wildfire`,
+  `crop_burning`, `cropland_fire`, `other`, `mixed`, `unknown`, with the
+  reason), `event_land_cover`, `BurningRules`, `BurningVerdict`, and
+  `WorldCover` (extra `firms-client[landcover]`, `rasterio>=1.4`): ESA
+  WorldCover 10 m read in place with HTTP range requests, or from a local
+  copy. `docs/landcover_italy.py` describes a country's year.
+- `bulletin_facts(..., burning=...)`: the land under the event goes into
+  the bulletin facts, with a caveat.
+
 ## [0.4.0] - 2026-11-04
 
 ### Added
