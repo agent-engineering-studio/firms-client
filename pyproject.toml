@@ -1,6 +1,6 @@
 [project]
 name = "firms-client"
-version = "0.4.0"
+version = "0.5.0"
 description = "Client for NASA FIRMS active fires: open per-country archives, NRT area API, detection types"
 readme = "README.md"
 keywords = ["firms", "nasa", "wildfire", "active fire", "hotspot", "modis", "viirs", "remote sensing"]
