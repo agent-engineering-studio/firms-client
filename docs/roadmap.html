@@ -32,7 +32,7 @@
       an LLM explaining numbers that code has already computed.
     </p>
     <div class="callout">
-      <p><strong>Shipped:</strong> the foundations (v0.3), the AI-ready layer (v0.4) and the static-source mask and anomalies (v0.5). Everything marked <span class="tag hi">✓ shipped</span> below is on <code>main</code>, with tests and measured on the real Italian archives. Also shipped: grounded alert bulletins (v1.0). Next: crop burning vs wildfire.</p>
+      <p><strong>Shipped:</strong> the foundations (v0.3), the AI-ready layer (v0.4) and the static-source mask and anomalies (v0.5). Everything marked <span class="tag hi">✓ shipped</span> below is on <code>main</code>, with tests and measured on the real Italian archives. Also shipped (v1.0): grounded alert bulletins, crop burning vs wildfire by land cover. Next: training sets for fire-risk models.</p>
     </div>
     <ul class="toc">
       <li><a href="#principles">Principles</a></li>
@@ -63,7 +63,7 @@
       <div class="phase"><span class="v">v0.3</span><h3>Foundations</h3><ul><li>✅ opt-in retries for 429 / 5xx</li><li>✅ area API over long date ranges</li><li>✅ keep every CSV column</li><li>✅ <code>firms</code> command line</li></ul></div>
       <div class="phase"><span class="v">v0.4</span><h3>AI-ready</h3><ul><li>✅ <code>summarize()</code>: compact stats for LLMs</li><li>✅ fire events (spatio-temporal clusters)</li><li>✅ <code>firms-mcp</code> server</li><li>✅ <code>llms.txt</code> (on this site)</li></ul></div>
       <div class="phase"><span class="v">v0.5</span><h3>Learned filters</h3><ul><li>✅ static-source mask from the archives</li><li>✅ anomaly vs the historical baseline</li><li><code>type</code> classifier for new sources</li></ul></div>
-      <div class="phase"><span class="v">v1.0</span><h3>Answers</h3><ul><li>✅ grounded alert bulletins</li><li>crop burning vs wildfire, with land cover</li><li>training sets for fire-risk models</li></ul></div>
+      <div class="phase"><span class="v">v1.0</span><h3>Answers</h3><ul><li>✅ grounded alert bulletins</li><li>✅ crop burning vs wildfire, with land cover</li><li>training sets for fire-risk models</li></ul></div>
     </div>
   </section>
 
@@ -204,8 +204,12 @@ draft.grounded  <span class="c"># False if a number or a place is not in the fac
 
     <div class="feature" id="landcover">
       <h3>🌾 Crop burning vs wildfire</h3>
-      <div class="meta"><span class="tag ai">ML</span><span class="tag">v1.0</span><span class="tag">large</span></div>
+      <div class="meta"><span class="tag ai">land cover</span><span class="tag">v1.0</span><span class="tag">large</span><span class="tag hi">✓ shipped</span></div>
       <p>The one thing <code>type</code> cannot do. Join each event with land cover (ESA WorldCover, CORINE in Europe) and the calendar: small, short, low-FRP events on cropland in the weeks after harvest are stubble burning; events reaching forest or shrubland are not. A rule set first, a model on the event features if the rules plateau.</p>
+<pre><code><span class="k">with</span> WorldCover() <span class="k">as</span> land:  <span class="c"># ESA WorldCover 10 m, read in place: extra [landcover]</span>
+    verdict = classify_burning(event, land)
+<span class="c"># crop_burning: cropland 92%, natural vegetation 8%, 11 hotspots over 1 day</span></code></pre>
+      <p>Italy 2025: of the 100 largest events, 76% burn in natural vegetation and 9% are crop burning; crop burning comes from June to October, mostly on the Apulian plain. The Etna lava flow reads as vegetation: use it with the static-source mask.</p>
     </div>
 
     <div class="feature" id="training">
@@ -238,11 +242,11 @@ draft.grounded  <span class="c"># False if a number or a place is not in the fac
           <tr><td><a href="#classifier"><code>type</code> classifier</a></td><td>★★</td><td>large</td><td>columns, mask</td><td><code>[ml]</code> extra</td></tr>
           <tr><td><a href="#bulletins">Bulletins</a></td><td>★★</td><td>medium</td><td>events, mask, anomaly</td><td>core + extra <code>[claude]</code> ✅</td></tr>
           <tr><td><a href="#training">Training sets</a></td><td>★★</td><td>medium</td><td>mask, events</td><td><code>[ml]</code> extra</td></tr>
-          <tr><td><a href="#landcover">Crop vs wildfire</a></td><td>★</td><td>large</td><td>events, land cover</td><td><code>[ml]</code> extra</td></tr>
+          <tr><td><a href="#landcover">Crop vs wildfire</a></td><td>★</td><td>large</td><td>events, land cover</td><td>extra <code>[landcover]</code> ✅</td></tr>
         </tbody>
       </table>
     </div>
-    <p>Done in this order: <strong>columns → events → static mask → summarize → firms-mcp</strong>. firms-client now answers the question it was built for, "is something burning in my area right now?", without the steelworks, and an agent can ask it in plain words. Then the bulletins. Next: <strong>crop vs wildfire → training sets → classifier</strong>.</p>
+    <p>Done in this order: <strong>columns → events → static mask → summarize → firms-mcp</strong>. firms-client now answers the question it was built for, "is something burning in my area right now?", without the steelworks, and an agent can ask it in plain words. Then the bulletins. Next: <strong>training sets → classifier</strong>.</p>
   </section>
 
   <section id="risks">

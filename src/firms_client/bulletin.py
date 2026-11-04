@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from anthropic.types.beta import BetaMessageParam, BetaOutputConfigParam
 
     from firms_client.anomaly import Anomaly
+    from firms_client.landcover import BurningVerdict
     from firms_client.mask import StaticMask
 
 _EARTH_RADIUS_KM = 6371.0088
@@ -70,7 +71,8 @@ You receive the facts as JSON. Write in the language given by "language".
 - body: 3 to 5 sentences. Where it burns relative to the nearest places
   (distance and direction as given), since when, how intense (fire
   radiative power, MW), how many satellite overpasses saw it, whether it
-  is unusual for the season if an anomaly is given.
+  is unusual for the season if an anomaly is given, and on what land
+  (forest, shrubland, cropland) if land_cover is given.
 - key_facts: 3 to 6 short items, each one fact.
 - places_mentioned: every place name you used, exactly as in the facts.
 - caveats: what the operator must keep in mind, from the facts' caveats.
@@ -139,6 +141,7 @@ def bulletin_facts(
     places: Iterable[Place] = (),
     mask: StaticMask | None = None,
     anomaly: Anomaly | None = None,
+    burning: BurningVerdict | None = None,
     source: str | None = None,
     region: str | None = None,
     nearest: int = 3,
@@ -159,6 +162,7 @@ def bulletin_facts(
         "nearest_places": nearest_places(event.latitude, event.longitude, places, k=nearest),
         "static_source": None,
         "season": anomaly.as_dict() if anomaly is not None else None,
+        "land_cover": burning.as_dict() if burning is not None else None,
         "caveats": [
             "Satellite detections of heat, not ground observations; confirm on the ground.",
             "Detections are hot pixels of about 375 m (VIIRS) or 1 km (MODIS); the extent "
@@ -167,6 +171,11 @@ def bulletin_facts(
         ],
         "attribution": ATTRIBUTION,
     }
+    if burning is not None:
+        facts["caveats"].append(
+            "What burns is inferred from a land-cover map (ESA WorldCover 2021) under the "
+            "detections, not observed: fields and forests may have changed since."
+        )
     if mask is not None:
         verdicts = [mask.verdict(h) for h in event.hotspots]
         found = [v for v in verdicts if v is not None]
