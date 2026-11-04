@@ -30,7 +30,8 @@ firms = "firms_client.cli:main"
 firms-mcp = "firms_client.mcp_server:main"
 
 [project.urls]
-Homepage = "https://github.com/agent-engineering-studio/firms-client"
+Homepage = "https://agentengineering.it/firms-client/"
+Source = "https://github.com/agent-engineering-studio/firms-client"
 Issues = "https://github.com/agent-engineering-studio/firms-client/issues"
 Changelog = "https://github.com/agent-engineering-studio/firms-client/blob/main/CHANGELOG.md"
 

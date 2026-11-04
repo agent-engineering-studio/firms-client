@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>firms-client</title>
+  <meta name="description" content="A small, typed, async Python library for NASA FIRMS active fires: open per-country archives since 2000, the near-real-time area API, and the one column that tells a wildfire from a steelworks.">
+  <meta property="og:title" content="firms-client: NASA active fires in Python">
+  <meta property="og:description" content="Open per-country FIRMS archives with no key, the near-real-time area API, and vegetation fires told apart from industry.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/agent-engineering-studio/firms-client/main/docs/images/banner.svg">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+  <link rel="alternate" type="text/plain" title="llms.txt" href="llms.txt">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="dot"></span>firms-client</a>
+    <nav>
+      <a href="#quick-start">Quick start</a>
+      <a href="#not-every-hotspot">Fire or factory?</a>
+      <a href="#api">API</a>
+      <a href="roadmap.html">Roadmap &amp; AI</a>
+      <a href="https://github.com/agent-engineering-studio/firms-client">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">NASA FIRMS · Python 3.12+ · Apache-2.0</p>
+    <h1>Every active fire seen from space since 2000, in a few lines of Python.</h1>
+    <p class="lead">
+      <strong>firms-client</strong> downloads the open per-country FIRMS archives (no account, no key),
+      queries the near-real-time area API, and does the parsing that tells a
+      <strong>vegetation fire from a steelworks</strong>. One dependency: <code>httpx</code>.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="#quick-start">Get started</a>
+      <a class="btn install" href="https://pypi.org/project/firms-client/">pip install firms-client</a>
+      <a class="btn" href="roadmap.html">What's next: AI roadmap →</a>
+    </div>
+    <img src="images/banner.svg" alt="firms-client: NASA active fires in Python, with a map of 2025 VIIRS detections over Italy" width="1000" height="250">
+  </section>
+
+  <section id="features">
+    <p class="eyebrow">What it does</p>
+    <h2>Small, typed, honest about the data</h2>
+    <p class="sub">Built for researchers, data engineers and civil-protection teams who want FIRMS data in a notebook or a pipeline, without the e-mail order form.</p>
+    <div class="grid">
+      <div class="card"><h3><span class="icon">📦</span>Open yearly archives</h3><p>MODIS from 2000 and VIIRS S-NPP from 2012, per country, with no Earthdata login and no key.</p></div>
+      <div class="card"><h3><span class="icon">💾</span>Never download twice</h3><p>Archives are saved in a persistent data directory (<code>FIRMS_DATA_DIR</code>) and read from disk next time.</p></div>
+      <div class="card"><h3><span class="icon">⚡</span>Near-real-time API</h3><p>The last 1-5 days over any bounding box, about 3 hours after the overpass, with a free MAP_KEY.</p></div>
+      <div class="card"><h3><span class="icon">🔥</span>Fire or factory?</h3><p>Every detection carries its FIRMS <code>type</code>: vegetation, volcano, industry, offshore.</p></div>
+      <div class="card"><h3><span class="icon">🎚️</span>One confidence scale</h3><p>MODIS percentages and VIIRS <code>l</code>/<code>n</code>/<code>h</code> judged by one rule.</p></div>
+      <div class="card"><h3><span class="icon">🛡️</span>Errors that look like errors</h3><p>A missing year is <code>None</code>; a bad key or an error page served with HTTP 200 raises <code>FirmsError</code>.</p></div>
+      <div class="card"><h3><span class="icon">🧪</span>Pure functions too</h3><p>URLs and parsing are plain functions, if you bring your own HTTP stack.</p></div>
+      <div class="card"><h3><span class="icon">🪶</span>Light</h3><p>One dependency, <code>mypy --strict</code>, 100% test coverage, tests that never touch the network.</p></div>
+    </div>
+  </section>
+
+  <section id="quick-start">
+    <p class="eyebrow">Quick start</p>
+    <h2>A country's year, no key needed</h2>
+    <pre><code>pip install firms-client</code></pre>
+<pre><code><span class="k">import</span> asyncio
+<span class="k">from</span> collections <span class="k">import</span> Counter
+
+<span class="k">import</span> httpx
+
+<span class="k">from</span> firms_client <span class="k">import</span> ARCHIVE_PRODUCTS, fetch_archive, select
+
+
+<span class="k">async def</span> main() -> None:
+    <span class="k">async with</span> httpx.AsyncClient(timeout=120) <span class="k">as</span> client:
+        <span class="k">for</span> product <span class="k">in</span> ARCHIVE_PRODUCTS:
+            rows = <span class="k">await</span> fetch_archive(client, product, 2025, <span class="s">"Italy"</span>)
+            <span class="k">if</span> rows <span class="k">is</span> None:  <span class="c"># that year is not published (yet)</span>
+                <span class="k">continue</span>
+            fires = select(rows)  <span class="c"># vegetation fires, nominal confidence or better</span>
+            types = dict(sorted(Counter(r.detection_type <span class="k">for</span> r <span class="k">in</span> rows).items()))
+            print(product.slug, len(rows), <span class="s">"detections"</span>, types, <span class="s">"->"</span>, len(fires), <span class="s">"fires"</span>)
+
+
+asyncio.run(main())</code></pre>
+<pre><code><span class="c">modis 5076 detections {0: 3414, 1: 21, 2: 1635, 3: 6} -> 3315 fires
+viirs-snpp 23349 detections {0: 17533, 1: 633, 2: 4277, 3: 906} -> 14880 fires</span></code></pre>
+    <p>The CSVs are now in <code>~/.cache/firms-client/</code>: run it again and nothing is downloaded.</p>
+
+    <h3>Or the last days, with a MAP_KEY</h3>
+    <p>The archive runs up to the previous year. For the last days, get a free
+      <a href="https://firms.modaps.eosdis.nasa.gov/api/map_key/">MAP_KEY</a> and ask the area API:</p>
+<pre><code><span class="k">from</span> firms_client <span class="k">import</span> fetch_area, select
+
+ITALY = (6.0, 36.0, 19.0, 47.6)  <span class="c"># west, south, east, north</span>
+
+rows = <span class="k">await</span> fetch_area(client, MAP_KEY, <span class="s">"VIIRS_SNPP_NRT"</span>, ITALY, days=3)
+fires = select(rows, min_frp_mw=1.0)</code></pre>
+  </section>
+
+  <section id="not-every-hotspot">
+    <p class="eyebrow">Fire or factory?</p>
+    <h2>Not every hotspot is a fire</h2>
+    <p class="sub">A satellite sees heat, not fire. Steelworks, refineries, gas flares, volcanoes and offshore platforms are hot every day of the year, and they come through at <strong>high confidence</strong>, because they really are hot.</p>
+    <div class="table">
+      <table>
+        <thead><tr><th><code>type</code></th><th>Constant</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sw veg"></span><code>0</code></td><td><code>VEGETATION_FIRE</code></td><td>presumed vegetation fire</td></tr>
+          <tr><td><span class="sw vol"></span><code>1</code></td><td><code>ACTIVE_VOLCANO</code></td><td>active volcano</td></tr>
+          <tr><td><span class="sw ind"></span><code>2</code></td><td><code>STATIC_LAND_SOURCE</code></td><td>other static land source: industry, gas flares</td></tr>
+          <tr><td><span class="sw off"></span><code>3</code></td><td><code>OFFSHORE</code></td><td>offshore</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <figure>
+      <img src="images/map.svg" alt="Map of Italy with 2025 VIIRS detections coloured by type: vegetation fires across the south and the islands, industrial sources in the Po valley and Taranto" loading="lazy">
+      <figcaption>VIIRS S-NPP detections over Italy in 2025, coloured by FIRMS type.</figcaption>
+    </figure>
+    <div class="callout">
+      <p>On Italy, about <strong>a quarter</strong> of the VIIRS detections are not vegetation fires, and 98% of those pass a nominal-confidence filter. Without <code>type == 0</code>, the most "burnt" square kilometre in the country over the whole archive is the ILVA steelworks in Taranto, with <strong>3,308 fire-days</strong>.</p>
+    </div>
+    <figure>
+      <img src="images/types.svg" alt="Share of detection types over Italy in 2025: MODIS 67% vegetation, 32% industry; VIIRS S-NPP 75% vegetation, 18% industry, 4% offshore, 3% volcano" loading="lazy">
+    </figure>
+    <figure>
+      <img src="images/monthly.svg" alt="Monthly VIIRS detections over Italy in 2025, stacked: vegetation fires peak in July (4,859); the other types stay between 255 and 875 a month" loading="lazy">
+      <figcaption>The difference is starkest in winter, when there are few real fires and the factories keep burning.</figcaption>
+    </figure>
+    <p>Two things no filter fixes: <strong>crop-residue burning</strong> is a real vegetation fire (<code>type</code> 0), and only land cover can set it apart; and FIRMS is <strong>presence-only</strong>, so no detection does not mean nothing burnt.</p>
+  </section>
+
+  <section id="how">
+    <p class="eyebrow">How it works</p>
+    <h2>Two doors in: archives and area API</h2>
+    <figure>
+      <img src="images/coverage.svg" alt="Timeline: MODIS archive from 2000 and VIIRS S-NPP from 2012, both open with no key; VIIRS NOAA-20 and NOAA-21 only through the near-real-time area API with a MAP_KEY" loading="lazy">
+    </figure>
+    <div class="table">
+      <table>
+        <thead><tr><th></th><th>Per-country archive</th><th>Area API</th></tr></thead>
+        <tbody>
+          <tr><td>Function</td><td><code>fetch_archive</code>, <code>download_archive</code></td><td><code>fetch_area</code></td></tr>
+          <tr><td>What</td><td>one country, one whole year</td><td>any bounding box, 1-5 days per query</td></tr>
+          <tr><td>Key</td><td>none</td><td>free MAP_KEY</td></tr>
+          <tr><td>Latency</td><td>up to the previous year</td><td>about 3 hours</td></tr>
+          <tr><td>Processing</td><td>standard (SP), with <code>type</code></td><td>near-real-time</td></tr>
+          <tr><td>Cached on disk</td><td>yes</td><td>no</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="api">
+    <p class="eyebrow">Reference</p>
+    <h2>API at a glance</h2>
+    <p class="sub">Every async function takes <strong>your</strong> <code>httpx.AsyncClient</code>: timeouts, proxies, retries and pooling stay yours.</p>
+    <div class="table">
+      <table>
+        <thead><tr><th>Name</th><th>Kind</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>fetch_archive(client, product, year, country, directory=None)</code></td><td>async</td><td>one year of a country, parsed; <code>None</code> if not published</td></tr>
+          <tr><td><code>fetch_archive_csv(…)</code></td><td>async</td><td>the same, as raw CSV text</td></tr>
+          <tr><td><code>download_archive(…)</code></td><td>async</td><td>the CSV's <code>Path</code> in the data directory, downloaded if missing</td></tr>
+          <tr><td><code>fetch_area(client, map_key, source, bbox, *, days=1, on_date=None)</code></td><td>async</td><td>near-real-time detections over a bbox</td></tr>
+          <tr><td><code>select(hotspots, *, vegetation_only, min_confidence, min_confidence_pct, min_frp_mw)</code></td><td>pure</td><td>keep what looks like a fire</td></tr>
+          <tr><td><code>parse_csv(text)</code></td><td>pure</td><td>CSV text → <code>list[Hotspot]</code></td></tr>
+          <tr><td><code>confidence_level(raw)</code></td><td>pure</td><td>MODIS % or VIIRS level → <code>"low"</code> / <code>"nominal"</code> / <code>"high"</code></td></tr>
+          <tr><td><code>is_hotspot_csv(text)</code></td><td>pure</td><td>is this a hotspot CSV, or an error page?</td></tr>
+          <tr><td><code>archive_url</code>, <code>archive_filename</code>, <code>area_url</code>, <code>archive_years</code></td><td>pure</td><td>URLs, file names, year ranges</td></tr>
+          <tr><td><code>default_directory()</code></td><td>pure</td><td><code>FIRMS_DATA_DIR</code>, else <code>~/.cache/firms-client</code></td></tr>
+          <tr><td><code>FirmsError</code></td><td>exception</td><td>FIRMS answered, but not with a hotspot CSV</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Full details, recipes (fire history, fire-days per km², GeoJSON, a wildfire trigger) and the traps we already fell into are in the
+      <a href="https://github.com/agent-engineering-studio/firms-client#readme">README</a>.</p>
+  </section>
+
+  <section id="next">
+    <p class="eyebrow">What's next</p>
+    <h2>From hotspots to answers</h2>
+    <p class="sub">An MCP server so agents can ask FIRMS questions, a learned static-source mask for near-real-time data that has no <code>type</code>, fire events instead of pixels, and alert bulletins grounded in computed numbers.</p>
+    <a class="btn primary" href="roadmap.html">Read the roadmap →</a>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>FIRMS data are provided by <strong>NASA LANCE / FIRMS</strong>. We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters.</p>
+    <p>Code under <a href="https://github.com/agent-engineering-studio/firms-client/blob/main/LICENSE">Apache-2.0</a> · Extracted from <a href="https://github.com/agent-engineering-studio/limen">Limen</a> · See also <a href="https://github.com/agent-engineering-studio/egms-client">egms-client</a> · <a href="llms.txt">llms.txt</a></p>
+  </div>
+</footer>
+</body>
+</html>
