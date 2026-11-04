@@ -153,3 +153,37 @@ def test_archive_json_digest(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["archive", "Italy", "2025", "--format", "json"], transport=TRANSPORT) == 0
     digest = json.loads(capsys.readouterr().out)
     assert digest["detections"] == 24 and "events" in digest and "attribution" in digest
+
+
+NRT = "\n".join(line.rsplit(",", 1)[0] for line in VIIRS.decode().splitlines()) + "\n"
+
+
+def nrt_handler(request: httpx.Request) -> httpx.Response:
+    if "/api/area/" in str(request.url):
+        return httpx.Response(200, text=NRT)
+    if "_2025_Italy" in str(request.url) or "_2024_Italy" in str(request.url):
+        return httpx.Response(200, content=VIIRS)
+    return httpx.Response(404, json={})
+
+
+def test_area_with_a_mask_types_the_untyped(capsys: pytest.CaptureFixture[str]) -> None:
+    transport = httpx.MockTransport(nrt_handler)
+    base = ["area", "--key", "KEY", "--bbox", "6,36,19,47.6"]
+    assert main(base, transport=transport) == 0
+    assert "no type: 24" in capsys.readouterr().out
+    assert main([*base, "--mask", "Italy"], transport=transport) == 0
+    captured = capsys.readouterr()
+    assert "static-source mask of Italy" in captured.err
+    assert "no type: 24" not in captured.out and "static land source" in captured.out
+
+
+def test_anomaly_command(capsys: pytest.CaptureFixture[str]) -> None:
+    transport = httpx.MockTransport(nrt_handler)
+    args = ["anomaly", "Italy", "2025", "--first-year", "2023"]
+    assert main([*args, "--month", "1"], transport=transport) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("2025: ") and "of 2 years" in out and "2024:" in out
+    assert main([*args, "--format", "json"], transport=transport) == 0
+    assert json.loads(capsys.readouterr().out)["of"] == 2
+    assert main(["anomaly", "Italy", "2011"], transport=transport) == 1
+    assert "no viirs-snpp archive" in capsys.readouterr().err

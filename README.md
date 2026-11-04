@@ -188,6 +188,8 @@ firms archive Italy 2025 --fires --format geojson > fires.geojson
 firms archive Greece 2024 --product modis --format csv
 FIRMS_MAP_KEY=… firms area --bbox 6,36,19,47.6 --days 3 --fires
 FIRMS_MAP_KEY=… firms area --bbox 6,36,19,47.6 --source VIIRS_SNPP_SP --from 2025-07-01 --to 2025-07-31
+FIRMS_MAP_KEY=… firms area --bbox 6,36,19,47.6 --days 2 --mask Italy --fires   # without the steelworks
+firms anomaly Italy 2017 --month 7
 ```
 
 ```
@@ -234,7 +236,8 @@ needed for the area API, and stays on the server: the model never sees it.
 |---|---|
 | `fire_history(country, product, first_year, last_year, bbox)` | detections and fires per year, from the open archives |
 | `archive_digest(country, year, product, bbox, top_events)` | one year: by type and month, largest events, hottest cells |
-| `area_digest(bbox, source, days \| start+end, top_events)` | the area API, last days or any range |
+| `area_digest(bbox, source, days \| start+end, top_events, mask_country)` | the area API, last days or any range; with `mask_country`, without static sources |
+| `season_anomaly(country, year, month, product, bbox, first_year)` | was this year or month unusual? rank, percentile, robust z |
 | `export_geojson(country, year, filename, product, bbox, fires_only)` | a GeoJSON file in `FIRMS_EXPORT_DIR` (default: `exports/` in the data directory) |
 
 Every tool answers with a `summarize()` digest of a few kilobytes, never raw
@@ -540,6 +543,58 @@ digest["hot_cells"][0]
 
 From a shell: `firms archive Italy 2025 --format json`.
 
+### Near-real-time data without the steelworks
+
+Area API rows have no `type`, so `select()` keeps every steelworks and
+volcano. A **static-source mask** learns from a country's archives where
+they are, cell by cell (0.01°), and gives live rows the `type` of the place
+they fall in:
+
+```python
+from firms_client import fetch_static_mask
+
+mask = await fetch_static_mask(client, "Italy")  # built once from 2012-last year, then cached
+live = await fetch_area(client, MAP_KEY, "VIIRS_NOAA21_NRT", ITALY, days=1)
+fires = select(mask.label(live))  # industry, volcanoes and platforms drop out
+```
+
+A cell is static when most of its archive detections are FIRMS `type`
+1-3 (`labelled`), or when it burned on at least 30 days, in 6 years and
+in 8 different months (`persistent`: a source FIRMS calls vegetation).
+`mask.verdict(h)` says which, with the history behind it, and
+`label(..., spare_frp_mw=50)` keeps strong detections untouched.
+
+How well does it work? The mask was learned on Italy 2012-2024, then the
+2025 archive was stripped of its `type`, as live data are, and labelled
+([`docs/evaluate_mask.py`](./docs/evaluate_mask.py)):
+
+| Italy 2025, `type` hidden | |
+|---|---:|
+| static detections (FIRMS type 1-3) caught | **99.3%** (5,773 / 5,816) |
+| of those, with the right type | 97.1% |
+| precision | 91.6% |
+| FIRMS type 0 masked | 3.0% (530 / 17,533) |
+| `select()` without the mask | 20,605 fires, 5,725 of them static |
+| `select()` with the mask | 14,430 fires, **42** of them static |
+
+Part of the "type 0 masked" are not mistakes: the Etna lava flow of
+February 2025, and type-0 detections inside the Taranto steelworks.
+
+### Is this season unusual?
+
+`season_anomaly` puts a year, or a month of it, against every other
+archive year: rank, percentile and a robust z-score (median and MAD).
+
+```python
+from firms_client import season_anomaly
+
+a = await season_anomaly(client, "Italy", 2017, month=7)
+a.describe()  # '2017: 7,552, the highest of 14 years (robust z +3.8)'
+```
+
+From a shell: `firms anomaly Italy 2017 --month 7`, or
+`firms anomaly Italy 2021 --bbox 12.3,36.6,15.7,38.35` for Sicily.
+
 ### A wildfire trigger
 
 ```python
@@ -582,7 +637,7 @@ rows = parse_csv(requests.get(url, timeout=120).text)
 | a bad MAP_KEY returns JSON | it is HTTP **400** with plain text `Invalid MAP_KEY.` |
 | the date in the area API ends the window | it **starts** it: `DATE .. DATE + days - 1`; without a date, the window ends today |
 | `type` 0 is always vegetation | a **lava flow** outside the volcano mask is `type` 0 too: Italy's largest 2025 "vegetation fire" event, 16-21 February, is on the flank of Etna |
-| near-real-time rows say what burned | the area API has **no `type`** column: a steelworks looks like a fire |
+| near-real-time rows say what burned | the area API has **no `type`** column: a steelworks looks like a fire; use a static-source mask |
 | no hotspot means no fire | FIRMS is presence-only: clouds, smoke and the overpass time hide fires |
 
 All checked against the live service on 3 November 2026.
@@ -601,6 +656,10 @@ All checked against the live service on 3 November 2026.
 | `RetryPolicy(attempts=3, backoff_s=1.0, max_backoff_s=30.0, …)` | type | opt-in retries for every fetch (`retry=`) |
 | `cluster(hotspots, *, radius_m=750.0, gap_days=1)` | pure | hotspots → `list[FireEvent]`, largest first |
 | `summarize(hotspots, *, top_events=10, top_cells=5, …)` | pure | a JSON-ready digest, a few KB, for people and LLMs |
+| `fetch_static_mask(client, country, *, product, first_year, last_year, rules)` | async | the static-source mask of a country, built once and cached |
+| `build_static_mask(hotspots, rules)`, `StaticMask.label/verdict/save/load`, `MaskRules` | pure | the same from rows you have |
+| `season_anomaly(client, country, year, *, month, bbox, product)` | async | a year or month against the other archive years |
+| `anomaly(series, year)` → `Anomaly` | pure | the same for any `{year: value}` series |
 | `to_geojson(hotspots)`, `to_csv(hotspots)` | pure | a GeoJSON `FeatureCollection`, a CSV of every field |
 | `select(hotspots, *, vegetation_only, min_confidence, min_confidence_pct, min_frp_mw)` | pure | keep what looks like a fire |
 | `parse_csv(text)` | pure | CSV text → `list[Hotspot]` |
@@ -640,8 +699,8 @@ the 2025 Italian archives.
 
 - 🌍 **More archives**: per-country files for other products, if FIRMS
   publishes them; a list of the country names FIRMS accepts.
-- 🏭 **A static-source mask** learned from the archives, for the
-  near-real-time rows that have no `type`.
+- 🌋 **Volcano proximity** in the static mask, and masks for more countries,
+  measured with `docs/evaluate_mask.py`.
 - 📓 **Notebooks**: a national fire history, a burnt-area comparison.
 
 If you use firms-client in a project or a paper, open an issue and tell us:
