@@ -27,12 +27,18 @@ dependencies = [
 
 [project.scripts]
 firms = "firms_client.cli:main"
+firms-mcp = "firms_client.mcp_server:main"
 
 [project.urls]
 Homepage = "https://agentengineering.it/firms-client/"
 Source = "https://github.com/agent-engineering-studio/firms-client"
 Issues = "https://github.com/agent-engineering-studio/firms-client/issues"
 Changelog = "https://github.com/agent-engineering-studio/firms-client/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+mcp = [
+    "mcp>=2.3,<3",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14"]

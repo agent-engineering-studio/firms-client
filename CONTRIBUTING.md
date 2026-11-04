@@ -2,6 +2,7 @@
 
 Issues and pull requests are welcome.
 
+- `uv sync --all-extras` once, so that the `mcp` extra and its tests are in.
 - Run `make check` before pushing: ruff, `mypy --strict` and pytest must be
   clean, the same gate CI runs.
 - The README images are generated: `uv run python docs/make_images.py`

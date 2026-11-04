@@ -25,6 +25,7 @@ from firms_client.hotspots import (
     is_hotspot_csv,
     parse_csv,
     select,
+    within,
 )
 from firms_client.retry import RetryPolicy
 from firms_client.sources import (
@@ -89,4 +90,5 @@ __all__ = [
     "summarize",
     "to_csv",
     "to_geojson",
+    "within",
 ]

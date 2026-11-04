@@ -202,6 +202,48 @@ FRP: max 420.84 MW, total 148141 MW
 
 The command line retries on 429, 5xx and dropped connections.
 
+### 5. Or ask an agent: the MCP server
+
+`firms-mcp` exposes FIRMS as tools over the
+[Model Context Protocol](https://modelcontextprotocol.io/), for Claude Code,
+Claude Desktop or any MCP client:
+
+```bash
+pip install 'firms-client[mcp]'
+
+# Claude Code
+claude mcp add firms -e FIRMS_MAP_KEY=your-key -- firms-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "firms": {
+      "command": "uvx",
+      "args": ["--from", "firms-client[mcp]", "firms-mcp"],
+      "env": { "FIRMS_MAP_KEY": "your-key" }
+    }
+  }
+}
+```
+
+That is Claude Desktop's `claude_desktop_config.json`. The MAP_KEY is only
+needed for the area API, and stays on the server: the model never sees it.
+
+| Tool | Answers |
+|---|---|
+| `fire_history(country, product, first_year, last_year, bbox)` | detections and fires per year, from the open archives |
+| `archive_digest(country, year, product, bbox, top_events)` | one year: by type and month, largest events, hottest cells |
+| `area_digest(bbox, source, days \| start+end, top_events)` | the area API, last days or any range |
+| `export_geojson(country, year, filename, product, bbox, fires_only)` | a GeoJSON file in `FIRMS_EXPORT_DIR` (default: `exports/` in the data directory) |
+
+Every tool answers with a `summarize()` digest of a few kilobytes, never raw
+rows, so the numbers an agent quotes are computed here. The server's
+instructions and the `firms://guide` resource carry the traps (type,
+presence-only, no `type` in near-real-time data) and `firms://attribution`
+carries the NASA acknowledgement. Ask it *"how did the 2021 fire season in
+Sicily compare with 2025?"*: it calls `fire_history` with Sicily's bbox.
+
 ---
 
 ## Where downloads are saved
@@ -570,6 +612,8 @@ All checked against the live service on 3 November 2026.
 | `VEGETATION_FIRE`, `ACTIVE_VOLCANO`, `STATIC_LAND_SOURCE`, `OFFSHORE` | constants | the `type` values |
 | `Hotspot`, `FireEvent`, `ArchiveProduct`, `BBox`, `ConfidenceLevel` | types | |
 | `ATTRIBUTION`, `TYPE_NAMES` | constants | the NASA acknowledgement, names for `type` |
+| `within(hotspots, bbox)` | pure | the hotspots inside a bbox: one region of a country |
+| `firms_client.mcp_server` | extra `[mcp]` | `firms-mcp`, `build_server()`, and the tool logic as plain async functions |
 | `FirmsError` | exception | FIRMS answered, but not with a hotspot CSV |
 
 Every async function takes **your** `httpx.AsyncClient`: timeouts, proxies,
@@ -585,6 +629,7 @@ Issues and pull requests are welcome; see [CONTRIBUTING.md](./CONTRIBUTING.md).
 git clone https://github.com/agent-engineering-studio/firms-client
 cd firms-client
 uv sync
+uv sync --all-extras  # the mcp extra too, for its tests
 make check   # ruff, mypy --strict, pytest with coverage: the same gate as CI
 ```
 

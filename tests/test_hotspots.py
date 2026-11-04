@@ -124,3 +124,16 @@ def test_malformed_rows_are_skipped() -> None:
 )
 def test_is_hotspot_csv(text: str, expected: bool) -> None:
     assert is_hotspot_csv(text) is expected
+
+
+def test_within_keeps_the_bbox_edges_included() -> None:
+    from firms_client import within
+
+    rows = parse_csv(VIIRS)
+    assert within(rows, None) == rows
+    inside = within(rows, (6.0, 44.0, 14.0, 47.6))
+    assert inside and all(44.0 <= r.latitude <= 47.6 for r in inside)
+    first = rows[0]
+    assert within([first], (first.longitude, first.latitude, first.longitude, first.latitude)) == [
+        first
+    ]
