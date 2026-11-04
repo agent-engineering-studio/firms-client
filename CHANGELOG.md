@@ -33,6 +33,9 @@ All notable changes to this project are documented here. The format follows
 - `Hotspot.brightness_t5_k`, `scan_km`, `track_km` and `version`: the rest
   of the CSV, optional, for analysis and models.
 - `to_geojson` and `to_csv` (`CSV_COLUMNS`).
+- GitHub Pages site in `docs/` (home, roadmap with the planned AI features,
+  `llms.txt`), published by `.github/workflows/pages.yml`, at
+  https://agentengineering.it/firms-client/.
 
 ### Changed
 
