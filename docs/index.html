@@ -55,6 +55,10 @@
       <div class="card"><h3><span class="icon">🎚️</span>One confidence scale</h3><p>MODIS percentages and VIIRS <code>l</code>/<code>n</code>/<code>h</code> judged by one rule.</p></div>
       <div class="card"><h3><span class="icon">🛡️</span>Errors that look like errors</h3><p>A missing year is <code>None</code>; a bad key or an error page served with HTTP 200 raises <code>FirmsError</code>.</p></div>
       <div class="card"><h3><span class="icon">🧪</span>Pure functions too</h3><p>URLs and parsing are plain functions, if you bring your own HTTP stack.</p></div>
+      <div class="card"><h3><span class="icon">🏭</span>No steelworks in live data</h3><p>A static-source mask learned from the archives types near-real-time rows: 99.3% of static sources removed on Italy 2025.</p></div>
+      <div class="card"><h3><span class="icon">🧭</span>Events and digests</h3><p><code>cluster()</code> turns pixels into fire events; <code>summarize()</code> turns a year into 4 KB an LLM can read.</p></div>
+      <div class="card"><h3><span class="icon">🤖</span>MCP server</h3><p><code>firms-mcp</code> lets Claude and other agents ask FIRMS questions, with numbers computed by code.</p></div>
+      <div class="card"><h3><span class="icon">📈</span>Is this season unusual?</h3><p>Rank, percentile and robust z of any year or month against the archive: July 2017 is the highest in Italy since 2012.</p></div>
       <div class="card"><h3><span class="icon">🪶</span>Light</h3><p>One dependency, <code>mypy --strict</code>, 100% test coverage, tests that never touch the network.</p></div>
     </div>
   </section>
@@ -62,7 +66,8 @@
   <section id="quick-start">
     <p class="eyebrow">Quick start</p>
     <h2>A country's year, no key needed</h2>
-    <pre><code>pip install firms-client</code></pre>
+    <pre><code>pip install firms-client            <span class="c"># the library and the firms command</span>
+pip install <span class="s">'firms-client[mcp]'</span>     <span class="c"># plus the firms-mcp server</span></code></pre>
 <pre><code><span class="k">import</span> asyncio
 <span class="k">from</span> collections <span class="k">import</span> Counter
 
@@ -87,6 +92,15 @@ asyncio.run(main())</code></pre>
 viirs-snpp 23349 detections {0: 17533, 1: 633, 2: 4277, 3: 906} -> 14880 fires</span></code></pre>
     <p>The CSVs are now in <code>~/.cache/firms-client/</code>: run it again and nothing is downloaded.</p>
 
+    <h3>From a shell</h3>
+<pre><code>firms archive Italy 2025 --fires --format geojson > fires.geojson
+firms anomaly Italy 2017 --month 7
+FIRMS_MAP_KEY=… firms area --bbox 6,36,19,47.6 --days 2 --mask Italy --fires</code></pre>
+
+    <h3>From Claude, or any MCP client</h3>
+<pre><code>claude mcp add firms -e FIRMS_MAP_KEY=your-key -- firms-mcp</code></pre>
+    <p>Then ask: <em>"how did the 2021 fire season in Sicily compare with 2025?"</em> The tools answer with digests computed by firms-client, never raw rows.</p>
+
     <h3>Or the last days, with a MAP_KEY</h3>
     <p>The archive runs up to the previous year. For the last days, get a free
       <a href="https://firms.modaps.eosdis.nasa.gov/api/map_key/">MAP_KEY</a> and ask the area API:</p>
@@ -95,7 +109,8 @@ viirs-snpp 23349 detections {0: 17533, 1: 633, 2: 4277, 3: 906} -> 14880 fires</
 ITALY = (6.0, 36.0, 19.0, 47.6)  <span class="c"># west, south, east, north</span>
 
 rows = <span class="k">await</span> fetch_area(client, MAP_KEY, <span class="s">"VIIRS_SNPP_NRT"</span>, ITALY, days=3)
-fires = select(rows, min_frp_mw=1.0)</code></pre>
+mask = <span class="k">await</span> fetch_static_mask(client, <span class="s">"Italy"</span>)  <span class="c"># area rows have no type: learn it from the archives</span>
+fires = select(mask.label(rows), min_frp_mw=1.0)</code></pre>
   </section>
 
   <section id="not-every-hotspot">
@@ -169,6 +184,12 @@ fires = select(rows, min_frp_mw=1.0)</code></pre>
           <tr><td><code>is_hotspot_csv(text)</code></td><td>pure</td><td>is this a hotspot CSV, or an error page?</td></tr>
           <tr><td><code>archive_url</code>, <code>archive_filename</code>, <code>area_url</code>, <code>archive_years</code></td><td>pure</td><td>URLs, file names, year ranges</td></tr>
           <tr><td><code>default_directory()</code></td><td>pure</td><td><code>FIRMS_DATA_DIR</code>, else <code>~/.cache/firms-client</code></td></tr>
+          <tr><td><code>fetch_area_range(client, map_key, source, bbox, start, end)</code></td><td>async</td><td>any date range, in 5-day requests</td></tr>
+          <tr><td><code>cluster(hotspots, *, radius_m, gap_days)</code></td><td>pure</td><td>hotspots → <code>FireEvent</code>s, largest first</td></tr>
+          <tr><td><code>summarize(hotspots)</code></td><td>pure</td><td>a JSON digest of a few KB, for people and LLMs</td></tr>
+          <tr><td><code>fetch_static_mask(client, country)</code>, <code>mask.label(rows)</code></td><td>async / pure</td><td>the type of static sources, for rows that have none</td></tr>
+          <tr><td><code>season_anomaly(client, country, year, *, month, bbox)</code></td><td>async</td><td>a year or month against the other archive years</td></tr>
+          <tr><td><code>RetryPolicy()</code>, <code>retry=</code></td><td>type</td><td>opt-in retries for 429, 5xx and dropped connections</td></tr>
           <tr><td><code>FirmsError</code></td><td>exception</td><td>FIRMS answered, but not with a hotspot CSV</td></tr>
         </tbody>
       </table>
@@ -178,9 +199,9 @@ fires = select(rows, min_frp_mw=1.0)</code></pre>
   </section>
 
   <section id="next">
-    <p class="eyebrow">What's next</p>
+    <p class="eyebrow">Roadmap</p>
     <h2>From hotspots to answers</h2>
-    <p class="sub">An MCP server so agents can ask FIRMS questions, a learned static-source mask for near-real-time data that has no <code>type</code>, fire events instead of pixels, and alert bulletins grounded in computed numbers.</p>
+    <p class="sub">Shipped: fire events, digests for LLMs, the MCP server, the static-source mask and season anomalies. Next: alert bulletins grounded in computed numbers, crop burning told apart from wildfires, and training sets for fire-risk models.</p>
     <a class="btn primary" href="roadmap.html">Read the roadmap →</a>
   </section>
 </main>

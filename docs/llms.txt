@@ -14,11 +14,26 @@ Key facts an assistant must get right:
 - `detection_type`: 0 vegetation fire (`VEGETATION_FIRE`), 1 active volcano (`ACTIVE_VOLCANO`), 2 static land source / industry / gas flares (`STATIC_LAND_SOURCE`), 3 offshore (`OFFSHORE`).
 - High confidence does NOT mean fire: steelworks and flares are genuinely hot. Only `type` says what burned. About a quarter of VIIRS detections over Italy are not vegetation fires.
 - `select(hotspots, *, vegetation_only=True, min_confidence="nominal", min_confidence_pct=None, min_frp_mw=0.0)` keeps what looks like a fire. Rows without `type` or without confidence are kept.
-- Near-real-time area API rows carry no `type`, so `select()` cannot drop industrial sources from them.
+- Near-real-time area API rows carry no `type`, so `select()` cannot drop industrial sources from them. Fix: `mask = await fetch_static_mask(client, "Italy")` (built once from the country's archives, cached as JSON in the data directory), then `select(mask.label(rows))`. `mask.verdict(h)` explains a decision; `label(rows, spare_frp_mw=50)` leaves strong detections alone.
+- With `on_date`, the area API window runs forward: `on_date .. on_date + days - 1`. `days` outside 1-5 raises `ValueError`. Longer ranges: `fetch_area_range(client, map_key, source, bbox, start, end)`. Sources: `NRT_SOURCES` (last days), `SP_SOURCES` (standard processing, older periods).
+- Retries are off unless asked: `retry=RetryPolicy()` on any fetch (429, 5xx, transport errors, backoff, Retry-After).
+- `Hotspot` also has optional `brightness_t5_k`, `scan_km`, `track_km`, `version`.
+- `cluster(hotspots, *, radius_m=750.0, gap_days=1)` -> `list[FireEvent]` (largest by total FRP first; `start`, `end`, `days`, `size`, `bbox`, `peak_frp_mw`, `total_frp_mw`, `overpasses`, `as_dict()`). Cluster `select()`-ed rows. Use ~2000 m for MODIS.
+- `summarize(hotspots, *, top_events=10, top_cells=5)` -> JSON-ready dict of a few KB: `detections`, `period`, `by_type`, `by_month`, `by_daynight`, `frp_mw`, `fires`, `events`, `hot_cells`, `caveats`, `attribution`. Put this in prompts, not raw rows.
+- `season_anomaly(client, country, year, *, month=None, bbox=None, product=VIIRS_SNPP)` -> `Anomaly` (`rank`, `of`, `percentile`, `median`, `robust_z`, `describe()`, `as_dict()`); `anomaly({year: value}, year)` for any series.
+- `within(hotspots, bbox)`, `to_geojson(hotspots)`, `to_csv(hotspots)`.
+- A lava flow outside the volcano mask is `type` 0 (Etna, February 2025).
 - Confidence: MODIS is a 0-100 percentage, VIIRS is `l`/`n`/`h` or `low`/`nominal`/`high`. `confidence_level(raw)` maps both to `"low"`/`"nominal"`/`"high"` (MODIS: <30 low, 30-79 nominal, 80+ high).
 - FIRMS is presence-only: no detection does not mean no fire (clouds, smoke, overpass time).
 - Pure helpers: `parse_csv(text)`, `is_hotspot_csv(text)`, `archive_url`, `archive_filename`, `area_url`, `archive_years(product, until=)`, `default_directory()`.
-- Acknowledge "NASA FIRMS" in anything published.
+- Acknowledge "NASA FIRMS" in anything published (`ATTRIBUTION` has the text).
+
+## Command line and MCP
+
+- `firms archive Italy 2025 [--product modis] [--fires] [--format summary|json|csv|geojson]`
+- `firms area --bbox W,S,E,N [--source …] [--days N | --date D | --from D --to D] [--mask COUNTRY] [--key …]` (MAP_KEY from `FIRMS_MAP_KEY`)
+- `firms anomaly COUNTRY YEAR [--month M] [--bbox …]`
+- `pip install 'firms-client[mcp]'`, then `firms-mcp` (stdio). Tools: `fire_history`, `archive_digest`, `area_digest` (with `mask_country`), `season_anomaly`, `export_geojson`. Resources: `firms://guide`, `firms://attribution`. Claude Code: `claude mcp add firms -e FIRMS_MAP_KEY=… -- firms-mcp`.
 
 ## Example
 
