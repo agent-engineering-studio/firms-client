@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>firms-client roadmap</title>
+  <meta name="description" content="Where firms-client goes next: the foundations it needs, and the AI features built on them: an MCP server, a learned static-source mask for near-real-time data, fire events, anomaly detection and grounded alert bulletins.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><span class="dot"></span>firms-client</a>
+    <nav>
+      <a href="./#quick-start">Quick start</a>
+      <a href="./#api">API</a>
+      <a href="roadmap.html" aria-current="page">Roadmap &amp; AI</a>
+      <a href="https://github.com/agent-engineering-studio/firms-client/issues">Issues</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Roadmap · draft, November 2026</p>
+    <h1>From hotspots to answers</h1>
+    <p class="lead">
+      firms-client turns FIRMS into clean, typed detections. The next step is turning
+      detections into <strong>answers</strong>: what is burning, is it unusual, who should know.
+      Some of that is plain engineering, some of it is machine learning, and some of it is
+      an LLM explaining numbers that code has already computed.
+    </p>
+    <ul class="toc">
+      <li><a href="#principles">Principles</a></li>
+      <li><a href="#phases">Phases</a></li>
+      <li><a href="#gap">The gap that matters</a></li>
+      <li><a href="#foundations">Foundations</a></li>
+      <li><a href="#ai">AI features</a></li>
+      <li><a href="#priorities">Priorities</a></li>
+      <li><a href="#risks">Risks</a></li>
+    </ul>
+  </section>
+
+  <section id="principles">
+    <p class="eyebrow">Principles</p>
+    <h2>What does not change</h2>
+    <div class="grid">
+      <div class="card"><h3><span class="icon">🪶</span>The core stays light</h3><p><code>firms-client</code> keeps one dependency. ML and LLM features live in optional extras (<code>firms-client[ml]</code>) or sibling packages (<code>firms-mcp</code>), never in the import path of someone who only wants a CSV.</p></div>
+      <div class="card"><h3><span class="icon">🧮</span>Code counts, models narrate</h3><p>Every number an LLM shows comes from a function with a test. The model chooses tools and writes prose; it never sums detections in its head.</p></div>
+      <div class="card"><h3><span class="icon">🔍</span>Honest about the data</h3><p>FIRMS is presence-only, and <code>type</code> is missing in near-real-time data. Every feature says what it cannot see, as the README already does.</p></div>
+      <div class="card"><h3><span class="icon">📏</span>Measured, not vibes</h3><p>Every model ships with its evaluation: held-out years, per-class precision and recall, and the Italian archive as a fixed benchmark.</p></div>
+    </div>
+  </section>
+
+  <section id="phases">
+    <p class="eyebrow">Phases</p>
+    <h2>Four releases</h2>
+    <div class="phases">
+      <div class="phase"><span class="v">v0.3</span><h3>Foundations</h3><ul><li>opt-in retries for 429 / 5xx</li><li>area API over long date ranges</li><li>keep every CSV column</li><li><code>firms</code> command line</li></ul></div>
+      <div class="phase"><span class="v">v0.4</span><h3>AI-ready</h3><ul><li><code>summarize()</code>: compact stats for LLMs</li><li>fire events (spatio-temporal clusters)</li><li><code>firms-mcp</code> server</li><li><code>llms.txt</code> ✅ (on this site)</li></ul></div>
+      <div class="phase"><span class="v">v0.5</span><h3>Learned filters</h3><ul><li>static-source mask from 26 years of archives</li><li><code>type</code> classifier for NRT detections</li><li>anomaly vs the historical baseline</li></ul></div>
+      <div class="phase"><span class="v">v1.0</span><h3>Answers</h3><ul><li>grounded alert bulletins</li><li>crop burning vs wildfire, with land cover</li><li>training sets for fire-risk models</li></ul></div>
+    </div>
+  </section>
+
+  <section id="gap">
+    <p class="eyebrow">The gap that matters</p>
+    <h2>Near-real-time data has no <code>type</code></h2>
+    <p class="sub">The whole library is built on one insight: only the <code>type</code> column tells a wildfire from a steelworks. But that column comes with standard processing, in the yearly archives. The area API, the one you use for alerts, does not carry it.</p>
+    <div class="callout">
+      <p><code>select()</code> keeps a row without <code>type</code>, because it cannot judge it. So the <a href="https://github.com/agent-engineering-studio/firms-client#a-wildfire-trigger">wildfire trigger recipe</a>, run over Italy, can alert on the ILVA steelworks in Taranto on any clear night.</p>
+      <p>The archives already know where the factories are: <strong>3,308 fire-days</strong> on one square kilometre is not a wildfire. Learning that from history, and applying it to live data, is the highest-value feature on this page. See <a href="#static-mask">static-source mask</a> and <a href="#classifier">type classifier</a>.</p>
+    </div>
+  </section>
+
+  <section id="foundations">
+    <p class="eyebrow">Foundations</p>
+    <h2>What the AI features stand on</h2>
+    <p class="sub">None of these is AI. All of them are needed before AI is worth doing.</p>
+
+    <div class="feature" id="retries">
+      <h3>🔁 Opt-in retries and rate limits</h3>
+      <div class="meta"><span class="tag">v0.3</span><span class="tag">small</span></div>
+      <p>An MCP server or an agent calls the area API far more often than a person does. A <code>RetryPolicy</code> for 429 and 5xx with backoff and <code>Retry-After</code>, as in egms-client, opt-in so that <em>your client's</em> retries still win.</p>
+    </div>
+
+    <div class="feature" id="windows">
+      <h3>🗺️ Area API over history</h3>
+      <div class="meta"><span class="tag">v0.3</span><span class="tag">small</span></div>
+      <p>The <code>*_SP</code> sources and date ranges longer than 5 days, split into windows and merged. This is how an agent asks for "last month over this valley" without knowing the API's limit.</p>
+<pre><code>rows = <span class="k">await</span> fetch_area_range(client, key, <span class="s">"VIIRS_SNPP_SP"</span>, bbox, date(2025, 7, 1), date(2025, 7, 31))</code></pre>
+    </div>
+
+    <div class="feature" id="columns">
+      <h3>🧾 Keep every column</h3>
+      <div class="meta"><span class="tag">v0.3</span><span class="tag">small</span><span class="tag hi">needed for ML</span></div>
+      <p><code>parse_csv</code> drops <code>bright_ti5</code> / <code>bright_t31</code>, <code>scan</code>, <code>track</code> and <code>version</code>. The difference between the 4 µm and 11 µm brightness, and the pixel size, are among the best features to tell a gas flare from a grass fire. Add them to <code>Hotspot</code> as optional fields.</p>
+    </div>
+
+    <div class="feature" id="cli">
+      <h3>🖥️ A command line</h3>
+      <div class="meta"><span class="tag">v0.3</span><span class="tag">medium</span></div>
+      <p><code>firms archive Italy 2025 --select --geojson</code>, <code>firms area --bbox 6,36,19,47.6 --days 3</code>. Also the simplest tool an agent with a shell can use.</p>
+    </div>
+
+    <div class="feature" id="events">
+      <h3>🧭 Fire events, not pixels</h3>
+      <div class="meta"><span class="tag">v0.4</span><span class="tag">medium</span><span class="tag hi">needed by most AI features</span></div>
+      <p>Cluster neighbouring hotspots in space and time (a few hundred metres, a day or two) into <code>FireEvent</code>s: start, end, footprint, peak and total FRP, number of overpasses. Pure Python on a grid index, no scikit-learn in the core.</p>
+      <p>People ask about fires, not pixels. Events are what an LLM should talk about, what an alert should be about, and the unit a classifier should judge.</p>
+<pre><code>events = cluster(select(rows), radius_m=750, gap_days=1)
+<span class="c"># FireEvent(start=2025-07-24, end=2025-07-27, hotspots=212, peak_frp_mw=480.1, bbox=(…))</span></code></pre>
+    </div>
+  </section>
+
+  <section id="ai">
+    <p class="eyebrow">AI features</p>
+    <h2>Machine learning and LLMs, where they earn their place</h2>
+
+    <div class="feature" id="summarize">
+      <h3>📋 <code>summarize()</code>: hotspots an LLM can read</h3>
+      <div class="meta"><span class="tag ai">LLM-ready</span><span class="tag">v0.4</span><span class="tag">small</span></div>
+      <p>A national VIIRS year is 23,000 rows: pasting it into a prompt is expensive and the model will miscount it. <code>summarize()</code> returns a small, deterministic, JSON-serialisable digest: counts by type and month, top events by FRP, the hottest cells, what was filtered out and why, and the data's caveats.</p>
+<pre><code>digest = summarize(rows, by=(<span class="s">"type"</span>, <span class="s">"month"</span>), top_events=10)
+json.dumps(digest)  <span class="c"># ~2 KB instead of 2 MB: the context for any LLM call</span></code></pre>
+      <p>It is the building block of the MCP server and the bulletins, and it is useful without any AI at all.</p>
+    </div>
+
+    <div class="feature" id="mcp">
+      <h3>🤖 <code>firms-mcp</code>: FIRMS as tools for agents</h3>
+      <div class="meta"><span class="tag ai">agents</span><span class="tag">v0.4</span><span class="tag">medium</span><span class="tag hi">high impact</span></div>
+      <p>A <a href="https://modelcontextprotocol.io/">Model Context Protocol</a> server, as a sibling package, so Claude Desktop, Claude Code or any MCP client can answer "how many vegetation fires were there in Sicily last July, and how does that compare with 2017?" without writing code.</p>
+      <ul>
+        <li><code>fire_history(country, years, region_bbox?)</code>: per-year and per-month counts, from the cached archives;</li>
+        <li><code>fires_now(bbox, days)</code>: near-real-time events, with the static-source mask applied;</li>
+        <li><code>fire_events(country | bbox, period)</code>: clustered events with their stats;</li>
+        <li><code>export_geojson(…)</code>: a file the user can open in QGIS;</li>
+        <li>resources: the type table, the traps, the NASA attribution text.</li>
+      </ul>
+      <p>Every tool returns <code>summarize()</code>-sized output, never raw rows. The MAP_KEY stays in the server's environment; the model never sees it.</p>
+    </div>
+
+    <div class="feature" id="static-mask">
+      <h3>🏭 Static-source mask, learned from 26 years</h3>
+      <div class="meta"><span class="tag ai">statistical learning</span><span class="tag">v0.5</span><span class="tag">medium</span><span class="tag hi">highest impact</span></div>
+      <p>Close <a href="#gap">the gap</a> with the archives the library already caches. For each ~375 m cell, count fire-days per year, the share of <code>type</code> 2 / 3 detections, the share of night detections and the seasonality. A cell hot in January and July, night and day, for ten years, is a factory.</p>
+<pre><code>mask = await build_static_mask(client, <span class="s">"Italy"</span>, years=range(2012, 2026))
+mask.save(<span class="s">"italy-static.parquet"</span>)
+
+live = <span class="k">await</span> fetch_area(client, key, <span class="s">"VIIRS_NOAA21_NRT"</span>, ITALY)
+fires = select(mask.label(live))  <span class="c"># NRT rows get a predicted type; ILVA drops out</span></code></pre>
+      <p>Pure Python, no model weights, explainable ("this cell had 3,308 fire-days"). Evaluated by hiding the <code>type</code> column of 2025 and predicting it from 2012-2024.</p>
+    </div>
+
+    <div class="feature" id="classifier">
+      <h3>🎯 A <code>type</code> classifier for new sources</h3>
+      <div class="meta"><span class="tag ai">ML</span><span class="tag">v0.5</span><span class="tag">large</span><span class="tag">extra: <code>[ml]</code></span></div>
+      <p>The mask only knows places that were hot before. A new biogas plant or a new flare needs a model. A gradient-boosted classifier trained on the archives' labelled rows (millions across countries) with features from a single detection and its neighbourhood: FRP, the brightness bands, day/night, scan and track, fire-days of the cell so far, distance to the nearest known static source.</p>
+      <ul>
+        <li>trained offline per region, shipped as a small model file with a model card;</li>
+        <li>validated on years and countries it never saw;</li>
+        <li>outputs a probability, so <code>select()</code> can take a threshold instead of a hard rule.</li>
+      </ul>
+    </div>
+
+    <div class="feature" id="anomaly">
+      <h3>📈 Is this season unusual?</h3>
+      <div class="meta"><span class="tag ai">anomaly detection</span><span class="tag">v0.5</span><span class="tag">small</span></div>
+      <p>With 14 years of VIIRS and 26 of MODIS on disk, compare any month, region or week with its own history: percentile, z-score, rank ("the third worst July since 2012"). Robust statistics first; a seasonal model only if they are not enough. It is the question everyone asks in August, and the one an LLM should never answer from memory.</p>
+    </div>
+
+    <div class="feature" id="bulletins">
+      <h3>📰 Grounded alert bulletins</h3>
+      <div class="meta"><span class="tag ai">LLM</span><span class="tag">v1.0</span><span class="tag">medium</span><span class="tag">example, not core</span></div>
+      <p>The wildfire trigger, one step further: when a new event appears, an LLM writes a short bulletin for a civil-protection team, in their language, from structured inputs only: the event, the anomaly score, the static-mask verdict, nearby places from a gazetteer.</p>
+      <ul>
+        <li>structured output (JSON schema), with every number copied from the input and checked after generation;</li>
+        <li>human in the loop: a draft for an operator, never an automatic public alert;</li>
+        <li>shipped as a recipe and a notebook, provider-agnostic, with Claude as the reference.</li>
+      </ul>
+    </div>
+
+    <div class="feature" id="landcover">
+      <h3>🌾 Crop burning vs wildfire</h3>
+      <div class="meta"><span class="tag ai">ML</span><span class="tag">v1.0</span><span class="tag">large</span></div>
+      <p>The one thing <code>type</code> cannot do. Join each event with land cover (ESA WorldCover, CORINE in Europe) and the calendar: small, short, low-FRP events on cropland in the weeks after harvest are stubble burning; events reaching forest or shrubland are not. A rule set first, a model on the event features if the rules plateau.</p>
+    </div>
+
+    <div class="feature" id="training">
+      <h3>🧪 Training sets for fire-risk models</h3>
+      <div class="meta"><span class="tag ai">dataset</span><span class="tag">v1.0</span><span class="tag">medium</span></div>
+      <p>Researchers train fire-risk and burnt-area models on FIRMS. <code>build_training_set(country, years, grid_km)</code> produces a gridded, daily table of fire / no-fire with static sources removed, ready to join with weather (ERA5) and vegetation (NDVI). It handles the presence-only trap explicitly: absences are flagged as "not observed" when the overpass was cloudy or missing, not silently set to zero.</p>
+    </div>
+
+    <div class="feature" id="llms-txt">
+      <h3>📚 Docs that agents can read</h3>
+      <div class="meta"><span class="tag ai">LLM-ready</span><span class="tag hi">done</span></div>
+      <p>This site publishes <a href="llms.txt"><code>llms.txt</code></a>: the API, the type table and the traps in one plain-text file, so a coding assistant writes correct firms-client code on the first try (and knows that a steelworks comes through at high confidence).</p>
+    </div>
+  </section>
+
+  <section id="priorities">
+    <p class="eyebrow">Priorities</p>
+    <h2>Impact against effort</h2>
+    <div class="table">
+      <table>
+        <thead><tr><th>Feature</th><th>Impact</th><th>Effort</th><th>Needs</th><th>Ships as</th></tr></thead>
+        <tbody>
+          <tr><td><a href="#static-mask">Static-source mask</a></td><td>★★★</td><td>medium</td><td>archives, columns</td><td>core</td></tr>
+          <tr><td><a href="#summarize"><code>summarize()</code></a></td><td>★★★</td><td>small</td><td>events</td><td>core</td></tr>
+          <tr><td><a href="#mcp"><code>firms-mcp</code></a></td><td>★★★</td><td>medium</td><td>summarize, retries, windows</td><td>sibling package</td></tr>
+          <tr><td><a href="#events">Fire events</a></td><td>★★★</td><td>medium</td><td>—</td><td>core</td></tr>
+          <tr><td><a href="#anomaly">Anomaly vs baseline</a></td><td>★★</td><td>small</td><td>archives</td><td>core</td></tr>
+          <tr><td><a href="#retries">Retries</a>, <a href="#windows">windows</a>, <a href="#columns">columns</a></td><td>★★</td><td>small</td><td>—</td><td>core</td></tr>
+          <tr><td><a href="#cli">CLI</a></td><td>★★</td><td>medium</td><td>—</td><td>core (script)</td></tr>
+          <tr><td><a href="#classifier"><code>type</code> classifier</a></td><td>★★</td><td>large</td><td>columns, mask</td><td><code>[ml]</code> extra</td></tr>
+          <tr><td><a href="#bulletins">Bulletins</a></td><td>★★</td><td>medium</td><td>events, mask, anomaly</td><td>recipe / notebook</td></tr>
+          <tr><td><a href="#training">Training sets</a></td><td>★★</td><td>medium</td><td>mask, events</td><td><code>[ml]</code> extra</td></tr>
+          <tr><td><a href="#landcover">Crop vs wildfire</a></td><td>★</td><td>large</td><td>events, land cover</td><td><code>[ml]</code> extra</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Suggested order: <strong>columns → events → static mask → summarize → firms-mcp</strong>. After those five, firms-client answers the question it was built for, "is something burning in my area right now?", without the steelworks, and an agent can ask it in plain words.</p>
+  </section>
+
+  <section id="risks">
+    <p class="eyebrow">Risks</p>
+    <h2>What could go wrong, and the guardrail</h2>
+    <div class="table">
+      <table>
+        <thead><tr><th>Risk</th><th>Guardrail</th></tr></thead>
+        <tbody>
+          <tr><td>An LLM invents a number or a place</td><td>Numbers only from tools; bulletins checked against their input; places from a gazetteer, never from the model.</td></tr>
+          <tr><td>"No fire detected" read as "no fire"</td><td>Every summary and tool result carries the presence-only caveat and, when known, cloud or overpass gaps.</td></tr>
+          <tr><td>A learned mask hides a real fire next to a factory</td><td>The mask lowers a score, it does not delete; events with high FRP or growth near a masked cell are kept and flagged.</td></tr>
+          <tr><td>A model trained on Italy fails elsewhere</td><td>Per-region model cards, cross-country validation, and the rule-based mask as the fallback.</td></tr>
+          <tr><td>Agents exhaust the MAP_KEY's transaction limit</td><td>Retries with backoff, a short-lived cache in the MCP server, and long ranges served from the SP archives.</td></tr>
+          <tr><td>The core grows heavy</td><td>Extras and sibling packages; CI checks that <code>import firms_client</code> pulls in only <code>httpx</code>.</td></tr>
+          <tr><td>NASA attribution lost downstream</td><td>The acknowledgement text as an MCP resource and in every generated bulletin and export.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Have a use case, or want to pick one up? <a href="https://github.com/agent-engineering-studio/firms-client/issues">Open an issue</a>.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>FIRMS data are provided by <strong>NASA LANCE / FIRMS</strong>. We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters.</p>
+    <p>Code under <a href="https://github.com/agent-engineering-studio/firms-client/blob/main/LICENSE">Apache-2.0</a> · <a href="./">Home</a> · <a href="llms.txt">llms.txt</a></p>
+  </div>
+</footer>
+</body>
+</html>
