@@ -37,7 +37,7 @@ asyncio.run(main())
 ## Docs
 
 - [README](https://github.com/agent-engineering-studio/firms-client#readme): full guide, recipes, traps
-- [Site](https://agent-engineering-studio.github.io/firms-client/): overview
-- [Roadmap](https://agent-engineering-studio.github.io/firms-client/roadmap.html): planned features, including AI
+- [Site](https://agentengineering.it/firms-client/): overview
+- [Roadmap](https://agentengineering.it/firms-client/roadmap.html): planned features, including AI
 - [Changelog](https://github.com/agent-engineering-studio/firms-client/blob/main/CHANGELOG.md)
 - [PyPI](https://pypi.org/project/firms-client/)
