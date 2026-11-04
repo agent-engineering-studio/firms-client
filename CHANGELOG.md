@@ -6,10 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-04
+
 ### Added
 
+- `firms` command line: `firms archive COUNTRY YEAR`, `firms area --bbox …`,
+  with `--fires`, `--min-frp` and `--format csv | geojson | summary`; the
+  MAP_KEY from `--key` or `FIRMS_MAP_KEY`; retries on.
+- `RetryPolicy` and a `retry=` argument on every fetch: opt-in retries on
+  429, 5xx and transport errors, exponential backoff, `Retry-After`.
+- `fetch_area_range` and `area_windows`: any date range, in 5-day requests.
+- `SP_SOURCES` (the standard-processing area sources) and `MAX_AREA_DAYS`.
+- `Hotspot.brightness_t5_k`, `scan_km`, `track_km` and `version`: the rest
+  of the CSV, optional, for analysis and models.
+- `to_geojson` and `to_csv` (`CSV_COLUMNS`).
 - GitHub Pages site in `docs/` (home, roadmap with the planned AI features,
-  `llms.txt`), published by `.github/workflows/pages.yml`.
+  `llms.txt`), published by `.github/workflows/pages.yml`, at
+  https://agentengineering.it/firms-client/.
+
+### Changed
+
+- `area_url` (and so `fetch_area`) raises `ValueError` for `days` outside
+  1-5, instead of sending a request FIRMS refuses.
+
+### Fixed
+
+- The docs said `on_date` ends the area API window; FIRMS starts it there
+  (`DATE .. DATE + days - 1`).
 
 ## [0.2.0] - 2026-11-03
 
