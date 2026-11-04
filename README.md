@@ -595,6 +595,44 @@ a.describe()  # '2017: 7,552, the highest of 14 years (robust z +3.8)'
 From a shell: `firms anomaly Italy 2017 --month 7`, or
 `firms anomaly Italy 2021 --bbox 12.3,36.6,15.7,38.35` for Sicily.
 
+### Grounded alert bulletins
+
+When the trigger finds a new event, an LLM can draft the few lines an
+operator needs, in their language. Code gathers the facts; the model only
+writes; every number and place in the draft is then checked against the
+facts. With `pip install 'firms-client[claude]'`:
+
+```python
+from firms_client import ClaudeWriter, Place, bulletin_facts, draft_bulletin
+
+places = [
+    Place("Caltanissetta", 37.4901, 14.0629),
+    Place("Enna", 37.5670, 14.2795),
+]  # your gazetteer
+facts = bulletin_facts(event, places=places, mask=mask, anomaly=season, region="Sicily")
+draft = await draft_bulletin(facts, ClaudeWriter(), language="it")
+
+if draft.grounded:
+    print(draft.as_text())  # a draft for the operator, never a public alert
+else:
+    print(draft.problems)  # e.g. ["number '300' is not in the facts", "place 'Corleone' ..."]
+```
+
+- `bulletin_facts` has the event (first and last time seen, peak and total
+  FRP, overpasses, satellites, day and night detections), the nearest
+  places from **your** gazetteer with distance and direction, the
+  static-source verdict when the mask knows the place, the season's
+  anomaly, and the caveats. The model is never asked where places are.
+- `draft_bulletin` asks for structured output (`BULLETIN_SCHEMA`) and runs
+  `check_grounding`: numbers must be facts or facts rounded, places must be
+  in the facts. A draft that strays is sent back once with the list of
+  problems; if it still strays, `grounded` is false and `problems` says why.
+- `ClaudeWriter` calls Claude Opus 5.5 through the Anthropic API, with
+  refusals retried server-side on Anthropic's recommended fallback
+  (`fallbacks="default"`). Credentials come from the environment
+  (`ANTHROPIC_API_KEY`). Any other model works: a writer is just an async
+  `(system, facts_json, schema) -> dict`.
+
 ### A wildfire trigger
 
 ```python
@@ -660,6 +698,9 @@ All checked against the live service on 3 November 2026.
 | `build_static_mask(hotspots, rules)`, `StaticMask.label/verdict/save/load`, `MaskRules` | pure | the same from rows you have |
 | `season_anomaly(client, country, year, *, month, bbox, product)` | async | a year or month against the other archive years |
 | `anomaly(series, year)` → `Anomaly` | pure | the same for any `{year: value}` series |
+| `bulletin_facts(event, *, places, mask, anomaly, region)`, `Place`, `nearest_places` | pure | the facts a bulletin may use |
+| `draft_bulletin(facts, writer, *, language, retries)` → `Bulletin`, `check_grounding` | async / pure | an LLM draft, checked against the facts |
+| `ClaudeWriter(client=None, *, model="claude-opus-5-5", effort="medium")` | extra `[claude]` | a writer on the Anthropic API |
 | `to_geojson(hotspots)`, `to_csv(hotspots)` | pure | a GeoJSON `FeatureCollection`, a CSV of every field |
 | `select(hotspots, *, vegetation_only, min_confidence, min_confidence_pct, min_frp_mw)` | pure | keep what looks like a fire |
 | `parse_csv(text)` | pure | CSV text → `list[Hotspot]` |

@@ -65,7 +65,7 @@ def run[T](body: Callable[[httpx.AsyncClient], Coroutine[Any, Any, T]]) -> T:
 def test_the_core_does_not_import_mcp() -> None:
     code = (
         "import sys, firms_client; "
-        "sys.exit('mcp' in sys.modules or 'firms_client.mcp_server' in sys.modules)"
+        "sys.exit(any(m in sys.modules for m in ('mcp', 'anthropic', 'firms_client.mcp_server')))"
     )
     assert subprocess.run([sys.executable, "-c", code], check=False).returncode == 0
 
