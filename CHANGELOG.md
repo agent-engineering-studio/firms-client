@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `firms-mcp`, an MCP server (extra `firms-client[mcp]`, `mcp>=2.3`):
+  `fire_history`, `archive_digest`, `area_digest`, `export_geojson`, and the
+  `firms://guide` and `firms://attribution` resources. Tools answer with
+  digests, never raw rows; the MAP_KEY stays in the server's environment;
+  exports are written only inside `FIRMS_EXPORT_DIR`; anticipated errors
+  reach the model with their message. `import firms_client` still imports
+  only `httpx` (tested).
+- `within`: the hotspots inside a bbox.
+
 - `cluster` and `FireEvent`: hotspots within `radius_m` and `gap_days` of
   each other, linked into events (single linkage on a grid index, pure
   Python), with dates, bbox, centroid, peak and total FRP and overpasses;

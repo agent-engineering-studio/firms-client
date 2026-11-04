@@ -187,6 +187,20 @@ def select(
     return out
 
 
+def within(
+    hotspots: Iterable[Hotspot], bbox: tuple[float, float, float, float] | None
+) -> list[Hotspot]:
+    """The hotspots inside ``bbox`` ``(west, south, east, north)``, edges included.
+
+    All of them when ``bbox`` is ``None``. Use it to look at one region of a
+    country's archive.
+    """
+    if bbox is None:
+        return list(hotspots)
+    west, south, east, north = bbox
+    return [h for h in hotspots if west <= h.longitude <= east and south <= h.latitude <= north]
+
+
 def _confident(raw: str | None, minimum: ConfidenceLevel, min_pct: int | None) -> bool:
     if raw is None or not raw.strip():
         return True
