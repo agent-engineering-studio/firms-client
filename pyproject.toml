@@ -39,6 +39,9 @@ Changelog = "https://github.com/agent-engineering-studio/firms-client/blob/main/
 mcp = [
     "mcp>=2.3,<3",
 ]
+claude = [
+    "anthropic>=2.4,<3",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14"]

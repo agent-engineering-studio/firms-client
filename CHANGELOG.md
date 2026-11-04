@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Grounded alert bulletins: `bulletin_facts` (event, nearest places from
+  your gazetteer with distance and direction, static-source verdict, season
+  anomaly, caveats), `draft_bulletin` (structured output, one retry with
+  the problems), `check_grounding` (every number a fact or a rounded fact,
+  every place in the facts), `Bulletin` (always a draft), `Place`,
+  `nearest_places`, and `ClaudeWriter` (extra `firms-client[claude]`,
+  `anthropic>=2.4`: Claude Opus 5.5, `fallbacks="default"`).
+
 - Static-source mask for rows without `type` (the area API):
   `build_static_mask`, `fetch_static_mask` (built from a country's archives
   once, cached as JSON in the data directory), `StaticMask.label` /
