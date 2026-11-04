@@ -1,0 +1,38 @@
+# Publishes the static site in docs/ to GitHub Pages. Needs, once, the
+# repository's Pages source set to "GitHub Actions" (Settings → Pages).
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Collect the site
+        run: |
+          mkdir -p _site
+          cp docs/*.html docs/*.css docs/llms.txt _site/
+          cp -r docs/images _site/images
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
