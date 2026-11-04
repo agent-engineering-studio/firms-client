@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `cluster` and `FireEvent`: hotspots within `radius_m` and `gap_days` of
+  each other, linked into events (single linkage on a grid index, pure
+  Python), with dates, bbox, centroid, peak and total FRP and overpasses;
+  `distance_m`.
+- `summarize`: a deterministic, JSON-ready digest of a few kilobytes
+  (counts by type, month and day/night, kept fires, largest events, the
+  cells hot on the most days, caveats, NASA `ATTRIBUTION`), for people and
+  for LLM prompts. `firms … --format json` prints it.
+- README: lava flows outside the volcano mask are `type` 0 (Etna, February
+  2025).
+
 ## [0.3.0] - 2026-11-04
 
 ### Added
