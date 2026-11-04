@@ -463,6 +463,41 @@ Path("fires.geojson").write_text(json.dumps(to_geojson(select(rows))))
 Path("fires.csv").write_text(to_csv(select(rows)))  # every field, one row per hotspot
 ```
 
+### Fire events, not pixels
+
+One fire is often dozens of hotspots, seen by several satellites over
+several days. `cluster` links hotspots within `radius_m` and `gap_days` of
+each other into `FireEvent`s, the largest by total FRP first:
+
+```python
+from firms_client import cluster
+
+events = cluster(select(rows), radius_m=750, gap_days=1)  # VIIRS; ~2000 m for MODIS
+for e in events[:3]:
+    print(e.start, e.days, "days", e.size, "hotspots", f"{e.total_frp_mw:.0f} MW", e.bbox)
+```
+
+On Italy in 2025 the 14,880 VIIRS fires make 8,250 events.
+
+### A digest for people and LLMs
+
+`summarize` does the counting and returns a JSON-ready dict of a few
+kilobytes: counts by type, month and day/night, the fires `select()` keeps,
+the largest events, the cells hot on the most days, the caveats and the
+NASA attribution. Put it in a prompt instead of 23,000 rows: every number
+in it comes from code.
+
+```python
+from firms_client import summarize
+
+digest = summarize(rows, top_events=10, top_cells=5)
+digest["hot_cells"][0]
+# {'latitude': 45.15, 'longitude': 9.94, 'fire_days': 212, 'detections': 430,
+#  'not_vegetation_share': 0.991}
+```
+
+From a shell: `firms archive Italy 2025 --format json`.
+
 ### A wildfire trigger
 
 ```python
@@ -504,6 +539,7 @@ rows = parse_csv(requests.get(url, timeout=120).text)
 | a missing year is an empty file | it is a 404 with a JSON body; an error with status 200 is caught too |
 | a bad MAP_KEY returns JSON | it is HTTP **400** with plain text `Invalid MAP_KEY.` |
 | the date in the area API ends the window | it **starts** it: `DATE .. DATE + days - 1`; without a date, the window ends today |
+| `type` 0 is always vegetation | a **lava flow** outside the volcano mask is `type` 0 too: Italy's largest 2025 "vegetation fire" event, 16-21 February, is on the flank of Etna |
 | near-real-time rows say what burned | the area API has **no `type`** column: a steelworks looks like a fire |
 | no hotspot means no fire | FIRMS is presence-only: clouds, smoke and the overpass time hide fires |
 
@@ -521,6 +557,8 @@ All checked against the live service on 3 November 2026.
 | `fetch_area(client, map_key, source, bbox, *, days=1, on_date=None, retry=None)` | async | detections over a bbox, 1-5 days |
 | `fetch_area_range(client, map_key, source, bbox, start, end, *, retry=None)` | async | any date range, in 5-day requests |
 | `RetryPolicy(attempts=3, backoff_s=1.0, max_backoff_s=30.0, …)` | type | opt-in retries for every fetch (`retry=`) |
+| `cluster(hotspots, *, radius_m=750.0, gap_days=1)` | pure | hotspots → `list[FireEvent]`, largest first |
+| `summarize(hotspots, *, top_events=10, top_cells=5, …)` | pure | a JSON-ready digest, a few KB, for people and LLMs |
 | `to_geojson(hotspots)`, `to_csv(hotspots)` | pure | a GeoJSON `FeatureCollection`, a CSV of every field |
 | `select(hotspots, *, vegetation_only, min_confidence, min_confidence_pct, min_frp_mw)` | pure | keep what looks like a fire |
 | `parse_csv(text)` | pure | CSV text → `list[Hotspot]` |
@@ -530,7 +568,8 @@ All checked against the live service on 3 November 2026.
 | `default_directory()` | pure | `FIRMS_DATA_DIR`, else `~/.cache/firms-client` |
 | `MODIS`, `VIIRS_SNPP`, `ARCHIVE_PRODUCTS`, `NRT_SOURCES`, `SP_SOURCES`, `MAX_AREA_DAYS` | constants | products and sources |
 | `VEGETATION_FIRE`, `ACTIVE_VOLCANO`, `STATIC_LAND_SOURCE`, `OFFSHORE` | constants | the `type` values |
-| `Hotspot`, `ArchiveProduct`, `BBox`, `ConfidenceLevel` | types | |
+| `Hotspot`, `FireEvent`, `ArchiveProduct`, `BBox`, `ConfidenceLevel` | types | |
+| `ATTRIBUTION`, `TYPE_NAMES` | constants | the NASA acknowledgement, names for `type` |
 | `FirmsError` | exception | FIRMS answered, but not with a hotspot CSV |
 
 Every async function takes **your** `httpx.AsyncClient`: timeouts, proxies,
@@ -556,7 +595,6 @@ the 2025 Italian archives.
 
 - 🌍 **More archives**: per-country files for other products, if FIRMS
   publishes them; a list of the country names FIRMS accepts.
-- 🧭 **Clustering** neighbouring hotspots into fire events.
 - 🏭 **A static-source mask** learned from the archives, for the
   near-real-time rows that have no `type`.
 - 📓 **Notebooks**: a national fire history, a burnt-area comparison.

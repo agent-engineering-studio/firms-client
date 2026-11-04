@@ -147,3 +147,9 @@ def test_a_closed_pipe_is_not_a_crash(monkeypatch: pytest.MonkeyPatch, tmp_path:
     with (tmp_path / "out").open("w") as sink:
         monkeypatch.setattr("sys.stdout", ClosedPipe(sink.fileno()))
         assert main(["archive", "Italy", "2025", "--format", "geojson"], transport=TRANSPORT) == 0
+
+
+def test_archive_json_digest(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["archive", "Italy", "2025", "--format", "json"], transport=TRANSPORT) == 0
+    digest = json.loads(capsys.readouterr().out)
+    assert digest["detections"] == 24 and "events" in digest and "attribution" in digest

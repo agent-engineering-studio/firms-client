@@ -12,6 +12,7 @@ from firms_client.client import (
     fetch_area_range,
 )
 from firms_client.errors import FirmsError
+from firms_client.events import FireEvent, cluster, distance_m
 from firms_client.export import CSV_COLUMNS, to_csv, to_geojson
 from firms_client.hotspots import (
     ACTIVE_VOLCANO,
@@ -41,12 +42,14 @@ from firms_client.sources import (
     area_url,
     area_windows,
 )
+from firms_client.summary import ATTRIBUTION, TYPE_NAMES, summarize
 
 __version__ = version("firms-client")
 
 __all__ = [
     "ACTIVE_VOLCANO",
     "ARCHIVE_PRODUCTS",
+    "ATTRIBUTION",
     "CSV_COLUMNS",
     "ENV_DATA_DIR",
     "MAX_AREA_DAYS",
@@ -55,11 +58,13 @@ __all__ = [
     "OFFSHORE",
     "SP_SOURCES",
     "STATIC_LAND_SOURCE",
+    "TYPE_NAMES",
     "VEGETATION_FIRE",
     "VIIRS_SNPP",
     "ArchiveProduct",
     "BBox",
     "ConfidenceLevel",
+    "FireEvent",
     "FirmsError",
     "Hotspot",
     "RetryPolicy",
@@ -69,8 +74,10 @@ __all__ = [
     "archive_years",
     "area_url",
     "area_windows",
+    "cluster",
     "confidence_level",
     "default_directory",
+    "distance_m",
     "download_archive",
     "fetch_archive",
     "fetch_archive_csv",
@@ -79,6 +86,7 @@ __all__ = [
     "is_hotspot_csv",
     "parse_csv",
     "select",
+    "summarize",
     "to_csv",
     "to_geojson",
 ]

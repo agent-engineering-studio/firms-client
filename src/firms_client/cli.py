@@ -4,7 +4,8 @@
     firms area --bbox 6,36,19,47.6 --days 3 --fires
     firms area --bbox 6,36,19,47.6 --source VIIRS_SNPP_SP --from 2025-07-01 --to 2025-07-31
 
-Results go to stdout (``--format csv``, ``geojson`` or ``summary``),
+Results go to stdout (``--format summary``, ``json`` for the
+:func:`~firms_client.summarize` digest, ``csv`` or ``geojson``),
 messages to stderr. The MAP_KEY comes from ``--key`` or ``FIRMS_MAP_KEY``.
 Requests are retried on 429, 5xx and dropped connections.
 """
@@ -36,6 +37,7 @@ from firms_client.sources import (
     SP_SOURCES,
     BBox,
 )
+from firms_client.summary import summarize
 
 #: The environment variable ``firms area`` reads the MAP_KEY from.
 ENV_MAP_KEY = "FIRMS_MAP_KEY"
@@ -74,7 +76,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     common.add_argument("--min-frp", type=float, default=0.0, metavar="MW")
     common.add_argument(
-        "--format", choices=("csv", "geojson", "summary"), default="summary", dest="fmt"
+        "--format", choices=("summary", "json", "csv", "geojson"), default="summary", dest="fmt"
     )
 
     archive = commands.add_parser(
@@ -171,6 +173,8 @@ def main(
         text = to_csv(rows)
     elif args.fmt == "geojson":
         text = json.dumps(to_geojson(rows)) + "\n"
+    elif args.fmt == "json":
+        text = json.dumps(summarize(rows), indent=2) + "\n"
     else:
         text = summary(rows)
     try:
