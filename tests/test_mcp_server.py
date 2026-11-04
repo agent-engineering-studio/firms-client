@@ -162,7 +162,13 @@ def test_the_server_lists_its_tools_and_resources() -> None:
         return tools, resources, str(getattr(guide, "content", ""))
 
     tools, resources, guide = asyncio.run(listing())
-    assert tools == ["fire_history", "archive_digest", "area_digest", "export_geojson"]
+    assert tools == [
+        "fire_history",
+        "archive_digest",
+        "area_digest",
+        "export_geojson",
+        "season_anomaly",
+    ]
     assert resources == ["firms://guide", "firms://attribution"]
     assert "presence-only" in guide and "near-real-time rows have no" in guide
     (attribution,) = list(asyncio.run(server.read_resource("firms://attribution")))
@@ -225,3 +231,41 @@ def test_main_runs_stdio_or_explains_the_extra(
     monkeypatch.setattr(m, "build_server", other)
     with pytest.raises(ModuleNotFoundError):
         m.main()
+
+
+NRT = "\n".join(line.rsplit(",", 1)[0] for line in VIIRS.decode().splitlines()) + "\n"
+
+
+def nrt_handler(request: httpx.Request) -> httpx.Response:
+    if "/api/area/" in str(request.url):
+        return httpx.Response(200, text=NRT)
+    return handler(request)
+
+
+def test_area_digest_with_a_static_mask() -> None:
+    async def go(**kwargs: Any) -> dict[str, Any]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(nrt_handler)) as client:
+            return await m.area_digest(client, "KEY", NORTH, **kwargs)
+
+    plain = asyncio.run(go())
+    assert plain["by_type"]["unknown"] == 24 and "static_mask" not in plain
+    assert any("have no type" in c for c in plain["caveats"])
+    masked = asyncio.run(go(mask_country="Italy"))
+    assert masked["query"]["mask_country"] == "Italy"
+    assert masked["static_mask"]["years"] == [2024, 2025]
+    relabelled = sum(masked["static_mask"]["relabelled"].values())
+    assert relabelled > 0 and masked["by_type"]["unknown"] == 24 - relabelled
+    assert masked["fires"] < plain["fires"]
+    assert not any("have no type" in c for c in masked["caveats"])
+    assert any("static-source mask" in c for c in masked["caveats"])
+
+
+def test_season_digest_and_tool() -> None:
+    d = run(lambda c: m.season_digest(c, "Italy", 2025, first_year=2023, bbox=NORTH))
+    assert d["of"] == 2 and d["query"]["bbox"] == tuple(NORTH) and d["attribution"]
+    assert "description" in d and "not burnt area" in d["measure"]
+    server = m.build_server(TRANSPORT)
+    result = call(server, "season_anomaly", {"country": "Italy", "year": 2025, "month": 1})
+    assert result.structured_content["year"] == 2025
+    with pytest.raises(ToolError, match="month"):
+        call(server, "season_anomaly", {"country": "Italy", "year": 2025, "month": 13})

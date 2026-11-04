@@ -3,6 +3,8 @@
     firms archive Italy 2025 --fires --format geojson > fires.geojson
     firms area --bbox 6,36,19,47.6 --days 3 --fires
     firms area --bbox 6,36,19,47.6 --source VIIRS_SNPP_SP --from 2025-07-01 --to 2025-07-31
+    firms area --bbox 14.9,37.6,15.3,37.9 --days 2 --mask Italy --fires
+    firms anomaly Italy 2025 --month 7
 
 Results go to stdout (``--format summary``, ``json`` for the
 :func:`~firms_client.summarize` digest, ``csv`` or ``geojson``),
@@ -25,10 +27,12 @@ from pathlib import Path
 import httpx
 
 from firms_client import __version__
+from firms_client.anomaly import season_anomaly
 from firms_client.client import fetch_archive, fetch_area, fetch_area_range
 from firms_client.errors import FirmsError
 from firms_client.export import to_csv, to_geojson
 from firms_client.hotspots import Hotspot, select
+from firms_client.mask import fetch_static_mask
 from firms_client.retry import RetryPolicy
 from firms_client.sources import (
     ARCHIVE_PRODUCTS,
@@ -103,6 +107,22 @@ def _parser() -> argparse.ArgumentParser:
     area.add_argument("--from", type=_date, dest="start", help="a range of any length…")
     area.add_argument("--to", type=_date, dest="end", help="…up to this day, included")
     area.add_argument("--key", help=f"MAP_KEY (default: ${ENV_MAP_KEY})")
+    area.add_argument(
+        "--mask",
+        metavar="COUNTRY",
+        help="give untyped rows the type of that country's static-source mask",
+    )
+
+    anomaly_ = commands.add_parser(
+        "anomaly", help="was this year (or month) unusual? fires against the other years"
+    )
+    anomaly_.add_argument("country")
+    anomaly_.add_argument("year", type=int)
+    anomaly_.add_argument("--month", type=int, choices=range(1, 13), metavar="1-12")
+    anomaly_.add_argument("--bbox", type=_bbox, metavar="W,S,E,N", help="one region of it")
+    anomaly_.add_argument("--product", choices=sorted(_PRODUCTS), default="viirs-snpp")
+    anomaly_.add_argument("--first-year", type=int)
+    anomaly_.add_argument("--format", choices=("summary", "json"), default="summary", dest="fmt")
     return parser
 
 
@@ -123,6 +143,26 @@ def summary(rows: Sequence[Hotspot]) -> str:
     return "\n".join(lines) + "\n"
 
 
+async def _anomaly(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
+    found = await season_anomaly(
+        client,
+        args.country,
+        args.year,
+        month=args.month,
+        bbox=args.bbox,
+        product=_PRODUCTS[args.product],
+        first_year=args.first_year,
+        retry=RetryPolicy(),
+    )
+    if args.fmt == "json":
+        return json.dumps(found.as_dict(), indent=2) + "\n"
+    years = " ".join(
+        f"{y}:{v:,.0f}" for y, v in sorted({**found.baseline, found.year: found.value}.items())
+    )
+    spread = f"median {found.median:,.0f}, percentile {found.percentile:.0f}"
+    return f"{found.describe()}\n{spread}\n{years}\n"
+
+
 async def _rows(args: argparse.Namespace, client: httpx.AsyncClient) -> list[Hotspot]:
     retry = RetryPolicy()
     if args.command == "archive":
@@ -139,12 +179,18 @@ async def _rows(args: argparse.Namespace, client: httpx.AsyncClient) -> list[Hot
     if args.start is not None:
         if args.date is not None:
             raise UsageError("use either --date or --from/--to")
-        return await fetch_area_range(
+        rows = await fetch_area_range(
             client, key, args.source, args.bbox, args.start, args.end, retry=retry
         )
-    return await fetch_area(
-        client, key, args.source, args.bbox, days=args.days, on_date=args.date, retry=retry
-    )
+    else:
+        rows = await fetch_area(
+            client, key, args.source, args.bbox, days=args.days, on_date=args.date, retry=retry
+        )
+    if args.mask:
+        print(f"firms: static-source mask of {args.mask}…", file=sys.stderr)
+        mask = await fetch_static_mask(client, args.mask, retry=retry)
+        rows = mask.label(rows)
+    return rows
 
 
 def main(
@@ -153,15 +199,26 @@ def main(
     """Run the command line; the exit code is 0 on success, 1 on failure."""
     args = _parser().parse_args(argv)
 
-    async def run() -> list[Hotspot]:
+    async def run() -> str:
         async with httpx.AsyncClient(timeout=120, transport=transport) as client:
-            return await _rows(args, client)
+            if args.command == "anomaly":
+                return await _anomaly(args, client)
+            return _render(args, await _rows(args, client))
 
     try:
-        rows = asyncio.run(run())
+        text = asyncio.run(run())
     except (UsageError, FirmsError, ValueError, httpx.HTTPError) as error:
         print(f"firms: {error}", file=sys.stderr)
         return 1
+    try:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+    except BrokenPipeError:  # `firms … | head`: the reader is gone, and that is fine
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    return 0
+
+
+def _render(args: argparse.Namespace, rows: list[Hotspot]) -> str:
     if args.fires or args.min_frp > 0:
         rows = select(
             rows,
@@ -170,16 +227,9 @@ def main(
             min_frp_mw=args.min_frp,
         )
     if args.fmt == "csv":
-        text = to_csv(rows)
-    elif args.fmt == "geojson":
-        text = json.dumps(to_geojson(rows)) + "\n"
-    elif args.fmt == "json":
-        text = json.dumps(summarize(rows), indent=2) + "\n"
-    else:
-        text = summary(rows)
-    try:
-        sys.stdout.write(text)
-        sys.stdout.flush()
-    except BrokenPipeError:  # `firms … | head`: the reader is gone, and that is fine
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-    return 0
+        return to_csv(rows)
+    if args.fmt == "geojson":
+        return json.dumps(to_geojson(rows)) + "\n"
+    if args.fmt == "json":
+        return json.dumps(summarize(rows), indent=2) + "\n"
+    return summary(rows)

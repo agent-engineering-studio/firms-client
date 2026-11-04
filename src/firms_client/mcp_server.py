@@ -32,10 +32,12 @@ from typing import TYPE_CHECKING, Any, Literal
 import httpx
 
 from firms_client import __version__
+from firms_client.anomaly import season_anomaly
 from firms_client.client import default_directory, fetch_archive, fetch_area, fetch_area_range
 from firms_client.errors import FirmsError
 from firms_client.export import to_geojson
 from firms_client.hotspots import Hotspot, select, within
+from firms_client.mask import fetch_static_mask
 from firms_client.retry import RetryPolicy
 from firms_client.sources import ARCHIVE_PRODUCTS, BBox, archive_years
 from firms_client.summary import ATTRIBUTION, TYPE_NAMES, summarize
@@ -78,7 +80,8 @@ NASA FIRMS active-fire detections, through firms-client {__version__}.
   low-confidence pixels; "events" groups neighbouring fires in space and time.
 - High confidence does not mean fire: steelworks and gas flares are really
   hot. Only the FIRMS type says what burned, and near-real-time rows have no
-  type, so industry shows up as fire there: say so when it matters.
+  type, so industry shows up as fire there: pass mask_country to area_digest
+  to drop it with a static-source mask learned from the archives.
 - A lava flow outside the volcano mask is type 0 (vegetation) too.
 - FIRMS is presence-only: no detection does not mean no fire.
 - Quote numbers from tool results only. Pass on the caveats.
@@ -178,8 +181,14 @@ async def area_digest(
     start: date | None = None,
     end: date | None = None,
     top_events: int = 10,
+    mask_country: str | None = None,
 ) -> dict[str, Any]:
-    """The digest of the area API over ``bbox``: the last ``days``, or ``start`` to ``end``."""
+    """The digest of the area API over ``bbox``: the last ``days``, or ``start`` to ``end``.
+
+    With ``mask_country``, rows without ``type`` get it from that country's
+    static-source mask (built from its archives on first use, then cached),
+    so that industry and volcanoes drop out of the fires.
+    """
     area = _bbox(bbox)
     if area is None:
         raise ValueError("bbox is required")
@@ -192,9 +201,71 @@ async def area_digest(
     else:
         rows = await fetch_area(client, map_key, source, area, days=days, retry=_RETRY)
         window = {"last_days": days}
+    mask_info: dict[str, Any] | None = None
+    if mask_country is not None:
+        mask = await fetch_static_mask(client, mask_country, retry=_RETRY)
+        labelled = mask.label(rows)
+        changed = Counter(
+            TYPE_NAMES.get(after.detection_type, "unknown")
+            for before, after in zip(rows, labelled, strict=True)
+            if before.detection_type is None and after.detection_type is not None
+        )
+        rows = labelled
+        years = mask.meta.get("years") or []
+        mask_info = {
+            "country": mask_country,
+            "years": [min(years), max(years)] if years else None,
+            "relabelled": dict(changed),
+        }
     radius = _radius("modis" if source.startswith("MODIS") else "viirs-snpp")
     digest = summarize(rows, top_events=top_events, radius_m=radius)
-    return {"query": {"source": source, "bbox": area, **window}, **digest}
+    query = {"source": source, "bbox": area, **window, "mask_country": mask_country}
+    if mask_info is not None:
+        digest["caveats"] = [c for c in digest["caveats"] if "have no type" not in c] + [
+            f"A static-source mask learned from the {mask_country} archives labelled "
+            f"{sum(mask_info['relabelled'].values())} detections as volcano, industry or "
+            "offshore, and they were dropped from the fires. Detections that remain without "
+            "type are presumed vegetation; a new industrial source would not be caught."
+        ]
+        return {"query": query, "static_mask": mask_info, **digest}
+    return {"query": query, **digest}
+
+
+async def season_digest(
+    client: httpx.AsyncClient,
+    country: str,
+    year: int,
+    *,
+    month: int | None = None,
+    product: Product = "viirs-snpp",
+    bbox: Sequence[float] | None = None,
+    first_year: int | None = None,
+) -> dict[str, Any]:
+    """:func:`~firms_client.season_anomaly`, ready for JSON."""
+    area = _bbox(bbox)
+    found = await season_anomaly(
+        client,
+        country,
+        year,
+        month=month,
+        bbox=area,
+        product=_PRODUCTS[product],
+        first_year=first_year,
+        retry=_RETRY,
+    )
+    return {
+        "query": {
+            "country": country,
+            "year": year,
+            "month": month,
+            "product": product,
+            "bbox": area,
+        },
+        **found.as_dict(),
+        "measure": "vegetation-fire detections kept by select(), not burnt area",
+        "caveats": ["FIRMS is presence-only: no detection does not mean no fire."],
+        "attribution": ATTRIBUTION,
+    }
 
 
 async def export_geojson(
@@ -332,11 +403,15 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
         start: date | None = None,
         end: date | None = None,
         top_events: int = 10,
+        mask_country: str | None = None,
     ) -> dict[str, Any]:
         """Detections over a bounding box: the last 1-5 days, or start to end.
 
         bbox: [west, south, east, north]. *_NRT sources for the last days, *_SP for
-        older periods. NRT rows carry no FIRMS type: industry is not filtered out.
+        older periods. NRT rows carry no FIRMS type, so industry and volcanoes look
+        like fires: pass mask_country (the country the bbox is in, e.g. Italy) to
+        drop them with a static-source mask learned from that country's archives.
+        The first masked call for a country downloads its archives (tens of MB).
         """
         with anticipated():
             async with client() as c:
@@ -349,6 +424,7 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
                     start=start,
                     end=end,
                     top_events=top_events,
+                    mask_country=mask_country,
                 )
 
     @server.tool(name="export_geojson")
@@ -368,6 +444,32 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
             async with client() as c:
                 return await export_geojson(
                     c, country, year, filename, product=product, bbox=bbox, fires_only=fires_only
+                )
+
+    @server.tool(name="season_anomaly")
+    async def _season_anomaly(
+        country: str,
+        year: int,
+        month: int | None = None,
+        product: Product = "viirs-snpp",
+        bbox: list[float] | None = None,
+        first_year: int | None = None,
+    ) -> dict[str, Any]:
+        """Was this year (or this month of it) unusual? Fires against every other archive year.
+
+        Returns rank, percentile and a robust z-score, and a one-line description.
+        Use it for "was July 2025 a bad month for fires in Sardinia?" (with a bbox).
+        """
+        with anticipated():
+            async with client() as c:
+                return await season_digest(
+                    c,
+                    country,
+                    year,
+                    month=month,
+                    product=product,
+                    bbox=bbox,
+                    first_year=first_year,
                 )
 
     @server.resource("firms://guide", name="guide", mime_type="text/plain")

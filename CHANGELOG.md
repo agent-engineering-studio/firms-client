@@ -8,6 +8,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Static-source mask for rows without `type` (the area API):
+  `build_static_mask`, `fetch_static_mask` (built from a country's archives
+  once, cached as JSON in the data directory), `StaticMask.label` /
+  `verdict` / `save` / `load`, `MaskRules`, `CellVerdict`. Two rules,
+  `labelled` (FIRMS type 1-3 majority) and `persistent` (30 fire-days, 6
+  years, 8 months). On Italy 2025 with `type` hidden, trained on 2012-2024:
+  99.3% of static detections caught, 3.0% of type-0 detections masked
+  (`docs/evaluate_mask.py`).
+- `anomaly` and `season_anomaly` (`Anomaly`): a year or month against the
+  other archive years, with rank, percentile and robust z-score.
+- `firms anomaly COUNTRY YEAR [--month] [--bbox]`, `firms area --mask COUNTRY`.
+- MCP: `season_anomaly` tool; `area_digest(mask_country=…)` applies the mask
+  and says so in its caveats.
+
 - `firms-mcp`, an MCP server (extra `firms-client[mcp]`, `mcp>=2.3`):
   `fire_history`, `archive_digest`, `area_digest`, `export_geojson`, and the
   `firms://guide` and `firms://attribution` resources. Tools answer with
