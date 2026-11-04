@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Pages site in `docs/` (home, roadmap with the planned AI features,
+  `llms.txt`), published by `.github/workflows/pages.yml`.
+
 ## [0.2.0] - 2026-11-03
 
 ### Added

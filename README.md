@@ -23,7 +23,7 @@ rows = await fetch_archive(client, VIIRS_SNPP, 2025, "Italy")  # 23,349 detectio
 fires = select(rows)  # 14,880 vegetation fires
 ```
 
-One dependency: `httpx`.
+One dependency: `httpx`. Website: **[agent-engineering-studio.github.io/firms-client](https://agent-engineering-studio.github.io/firms-client/)**, with the [roadmap](https://agent-engineering-studio.github.io/firms-client/roadmap.html).
 
 ---
 
@@ -522,6 +522,10 @@ the 2025 Italian archives.
 - 🖥️ **A command line**: `firms archive Italy 2025`, `firms area --bbox …`.
 - 🧭 **Clustering** neighbouring hotspots into fire events.
 - 📓 **Notebooks**: a national fire history, a burnt-area comparison.
+
+The full plan, including the AI features (an MCP server, a learned
+static-source mask for near-real-time data, fire events, grounded alert
+bulletins), is on the [roadmap](https://agent-engineering-studio.github.io/firms-client/roadmap.html).
 
 If you use firms-client in a project or a paper, open an issue and tell us:
 we will link it here.

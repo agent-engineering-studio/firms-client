@@ -1,0 +1,43 @@
+# firms-client
+
+> Small, typed, async Python library (3.12+, one dependency: httpx) for NASA FIRMS active-fire detections: open per-country yearly archives with no key, the near-real-time area API with a free MAP_KEY, and parsing that tells a vegetation fire from industry. `pip install firms-client`.
+
+Key facts an assistant must get right:
+
+- Per-country yearly archives are static open CSVs: no Earthdata login, no key. Products: `MODIS` (2000-), `VIIRS_SNPP` (2012-). VIIRS NOAA-20/21 have no country archive.
+- `fetch_archive(client, product, year, country, directory=None)` -> `list[Hotspot] | None`. `None` means the year is not published (HTTP 404). Country is the English name as FIRMS writes it: `Italy`, `Greece`, `United_States`.
+- Archives are cached in `directory`, else `FIRMS_DATA_DIR`, else `$XDG_CACHE_HOME/firms-client` or `~/.cache/firms-client`. Delete a file to refresh it.
+- `fetch_area(client, map_key, source, bbox, *, days=1, on_date=None)` -> `list[Hotspot]`. `bbox` is `(west, south, east, north)`. `days` is 1-5. Sources: `VIIRS_SNPP_NRT`, `VIIRS_NOAA20_NRT`, `VIIRS_NOAA21_NRT`, `MODIS_NRT`. Never cached. Empty result is `[]`.
+- Every async function takes the caller's `httpx.AsyncClient`. Retries for 5xx/timeouts are the caller's job; httpx exceptions propagate.
+- `FirmsError`: a bad MAP_KEY or source (HTTP 400 plain text `Invalid MAP_KEY.`), or an error page served with HTTP 200.
+- `Hotspot` (frozen dataclass): `latitude`, `longitude`, `acq_date` (date, UTC), `acq_time` (int UTC HHMM, `126` = 01:26), `confidence` (str as written), `frp_mw`, `brightness_k`, `daynight`, `satellite`, `instrument`, `detection_type` (int | None), property `is_vegetation_fire`.
+- `detection_type`: 0 vegetation fire (`VEGETATION_FIRE`), 1 active volcano (`ACTIVE_VOLCANO`), 2 static land source / industry / gas flares (`STATIC_LAND_SOURCE`), 3 offshore (`OFFSHORE`).
+- High confidence does NOT mean fire: steelworks and flares are genuinely hot. Only `type` says what burned. About a quarter of VIIRS detections over Italy are not vegetation fires.
+- `select(hotspots, *, vegetation_only=True, min_confidence="nominal", min_confidence_pct=None, min_frp_mw=0.0)` keeps what looks like a fire. Rows without `type` or without confidence are kept.
+- Near-real-time area API rows carry no `type`, so `select()` cannot drop industrial sources from them.
+- Confidence: MODIS is a 0-100 percentage, VIIRS is `l`/`n`/`h` or `low`/`nominal`/`high`. `confidence_level(raw)` maps both to `"low"`/`"nominal"`/`"high"` (MODIS: <30 low, 30-79 nominal, 80+ high).
+- FIRMS is presence-only: no detection does not mean no fire (clouds, smoke, overpass time).
+- Pure helpers: `parse_csv(text)`, `is_hotspot_csv(text)`, `archive_url`, `archive_filename`, `area_url`, `archive_years(product, until=)`, `default_directory()`.
+- Acknowledge "NASA FIRMS" in anything published.
+
+## Example
+
+```python
+import asyncio, httpx
+from firms_client import VIIRS_SNPP, fetch_archive, select
+
+async def main() -> None:
+    async with httpx.AsyncClient(timeout=120) as client:
+        rows = await fetch_archive(client, VIIRS_SNPP, 2025, "Italy")
+        print(len(rows or []), "detections,", len(select(rows or [])), "vegetation fires")
+
+asyncio.run(main())
+```
+
+## Docs
+
+- [README](https://github.com/agent-engineering-studio/firms-client#readme): full guide, recipes, traps
+- [Site](https://agent-engineering-studio.github.io/firms-client/): overview
+- [Roadmap](https://agent-engineering-studio.github.io/firms-client/roadmap.html): planned features, including AI
+- [Changelog](https://github.com/agent-engineering-studio/firms-client/blob/main/CHANGELOG.md)
+- [PyPI](https://pypi.org/project/firms-client/)
