@@ -178,7 +178,7 @@ july = await fetch_area_range(
 
 The area API is near-real-time and is never cached. Its rows carry **no
 `type`**, so `select()` cannot drop industrial sources from them: see
-[the roadmap](https://agent-engineering-studio.github.io/firms-client/roadmap.html#gap).
+[the roadmap](https://agentengineering.it/firms-client/roadmap.html#gap).
 
 ### 4. Or from a shell
 
