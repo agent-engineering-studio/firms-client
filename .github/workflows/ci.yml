@@ -28,3 +28,21 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest --cov --cov-report=term-missing
       - run: uv build
+
+  core:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest
+      - run: uv run firms --help
+      - run: uv run firms archive --help
