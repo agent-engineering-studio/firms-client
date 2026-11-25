@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-25
+
 ### Added
 
 - Per-cell statistics (`firms_client.cells`): `cell_stats(hotspots, grid,
