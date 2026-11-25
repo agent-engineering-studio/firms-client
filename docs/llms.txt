@@ -55,6 +55,16 @@ Key facts an assistant must get right:
 - `check_columns(header)` -> `{"missing": [...], "unknown": [...]}`: a CSV header against the columns the library reads.
 - CLI: `firms status Italy [--days 30] [--key …] [--format json]`.
 
+## Per-cell statistics, for a model or a map
+
+- `cell_stats(hotspots, grid, *, cells=(), mask=None, land=None, land_radius_m=190.0, include_untyped=False)` -> `{cell: CellStats}`. Per cell: `fire_days` (distinct days with a `type` 0 detection; a day, not a detection), `detections`, `fire_days_per_km2`, `cropland` and `natural` (mean WorldCover share under the fire-days' detections, 0-1), `land_days`, `static_km` (distance from the cell centre to the nearest static source of the mask), `score` (`trust` at the centre of a cell with fire-days), `measured`, `reason`, `as_dict()`.
+- **`None` is not measured, never 0.** A cell whose centre is a static source of the mask is not measured (`fire_days` `None`). No land cover: `cropland` `None`; no mask: `static_km` `None`; no fire-day: `cropland` `None`. Zero fire-days is a measure, but FIRMS is presence-only (`seen()`).
+- Rows with no `type` (the area API) are skipped unless `include_untyped=True`: label them with `mask.label(rows)` first. Filter confidence before with `select(rows, vegetation_only=False)`.
+- Pass `cells=` (the whole grid) to get rows for the cells with zero fire-days.
+- Grids: `LaeaGrid(size_m=1000.0, origin=(0.0, 0.0))` (square cells in ETRS89-LAEA, EPSG:3035; `(row, col)` from `origin`; the default origin is the EEA reference grid, `grid.code(cell)` -> `"1kmE4321N3210"`); `DegreeGrid(step=0.01)`; any object with `cell_of`, `area_km2`, `centre` (the `Grid` protocol). `laea(lat, lon)` -> `(x, y)` and `laea_inverse(x, y)` -> `(lat, lon)`, no pyproj needed.
+- On the EFFIS benchmark, fires on 90 % agricultural land read 0.58-0.86 of cropland, wildfires 0-0.004: WorldCover calls pasture grassland, so `cropland` is low for an agricultural fire, never high for a wildfire.
+- CLI: `firms cells Italy 2024 [2025] [--bbox W,S,E,N] [--mask] [--land] [--size-m 1000] [--format csv|json]`.
+
 ## The rest of the public API
 
 - Archives: `download_archive(client, product, year, country, directory=None, *, retry=None)` -> `Path | None` (the cached yearly CSV), `fetch_archive_csv(...)` -> `str | None` (its text). `ARCHIVE_PRODUCTS` lists the `ArchiveProduct(slug, first_year)` values (`MODIS` 2000, `VIIRS_SNPP` 2012). `ENV_DATA_DIR` is `"FIRMS_DATA_DIR"`.

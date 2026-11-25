@@ -277,3 +277,24 @@ def test_status_command(
     assert main(["status", "Italy"], transport=transport) == 0
     out = capsys.readouterr().out
     assert 'MAP_KEY: {"transaction_limit": 5000}' in out and "data_id X" in out
+
+
+def test_cells_counts_fire_days_per_eea_cell(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["cells", "Italy", "2025"], transport=TRANSPORT) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("code,latitude,longitude,measured,detections,fire_days")
+    first = lines[1].split(",")
+    assert first[0].startswith("1kmE") and first[3] == "True"
+    assert all(int(line.split(",")[5]) >= 1 for line in lines[1:])
+
+
+def test_cells_as_json_in_a_region(capsys: pytest.CaptureFixture[str]) -> None:
+    args = ["cells", "Italy", "2025", "--bbox", "6,36,19,47.6", "--format", "json"]
+    assert main(args, transport=TRANSPORT) == 0
+    rows = json.loads(capsys.readouterr().out)
+    assert rows and rows[0]["cropland"] is None and rows[0]["static_km"] is None
+
+
+def test_cells_of_an_unpublished_year_is_an_error(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["cells", "Italy", "2011"], transport=TRANSPORT) == 1
+    assert "no viirs-snpp archive" in capsys.readouterr().err

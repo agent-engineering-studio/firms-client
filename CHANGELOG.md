@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Per-cell statistics (`firms_client.cells`): `cell_stats(hotspots, grid,
+  cells=, mask=, land=)` gives, for each cell, the fire-days (`type` 0,
+  distinct days), fire-days per km², the WorldCover cropland and natural
+  share under the fire-days, the distance from the nearest static source and
+  `trust` at the centre. `None` is not measured, never 0: a cell on a static
+  source of the mask is not measured. Grids: `LaeaGrid` (ETRS89-LAEA,
+  EPSG:3035; the default origin is the EEA 1 km reference grid, with
+  `code()`), `DegreeGrid`, or any `Grid`; `laea()` and `laea_inverse()`,
+  checked on the IOGP worked example, with no new dependency.
+  `firms cells COUNTRY FIRST [LAST] [--mask] [--land]`.
+- Benchmark: ten `cells` checks on the EFFIS perimeters. The cropland share
+  under the fire-days separates the agricultural fires (0.58-0.86) from the
+  wildfires (0-0.004), where `classify_burning` called three of four
+  agricultural fires `mixed`. 34 of 41 checks pass in all.
+
 ## [0.6.0] - 2026-11-25
 
 ### Added

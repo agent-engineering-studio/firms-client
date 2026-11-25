@@ -125,6 +125,24 @@ def _burning(case: dict[str, Any], check: dict[str, Any]) -> float | None:
     return float(verdict.kind in check["kinds"])
 
 
+def _cells(case: dict[str, Any], _check: dict[str, Any]) -> float | None:
+    from firms_client import LaeaGrid, WorldCover, cell_stats, select
+
+    folder = DATA / case["id"]
+    geometry = json.loads((folder / "perimeter.geojson").read_text())["geometry"]
+    rows = [
+        h
+        for h in select(_rows(case), vegetation_only=False)
+        if inside(h.longitude, h.latitude, geometry)
+    ]
+    with WorldCover(str(folder / "worldcover")) as land:
+        stats = cell_stats(rows, LaeaGrid(), land=land)
+    days = [(s.cropland, s.land_days) for s in stats.values() if s.cropland is not None]
+    if not days:
+        return None
+    return sum(c * n for c, n in days) / sum(n for _, n in days)
+
+
 def _reliable(case: dict[str, Any], check: dict[str, Any]) -> float | None:
     from firms_client import StaticMask, WorldCover, select, trust
 
@@ -157,6 +175,7 @@ METHODS: dict[str, Callable[[dict[str, Any], dict[str, Any]], float | None]] = {
     "season": _season,
     "burning": _burning,
     "reliable": _reliable,
+    "cells": _cells,
 }
 
 
@@ -204,9 +223,12 @@ def _expected(check: dict[str, Any]) -> str:
         return "not measured"
     if check["kind"] == "burning":
         return " or ".join(check["kinds"])
-    stat = {"kept": "share kept", "events": "events", "reliable": "score"}.get(
-        check["kind"]
-    ) or check["stat"]
+    stat = {
+        "kept": "share kept",
+        "events": "events",
+        "reliable": "score",
+        "cells": "cropland under the fire-days",
+    }.get(check["kind"]) or check["stat"]
     low, high = check.get("min"), check.get("max")
     if low is not None and high is not None:
         return f"{low} ≤ {stat} ≤ {high}"
