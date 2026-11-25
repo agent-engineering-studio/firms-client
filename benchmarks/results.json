@@ -1,7 +1,9 @@
 {
   "archives": [
     "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2021/viirs-snpp_2021_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2022/viirs-snpp_2022_Italy.csv",
     "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2023/viirs-snpp_2023_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2024/viirs-snpp_2024_Italy.csv",
     "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2025/viirs-snpp_2025_Italy.csv"
   ],
   "rows": [
@@ -121,6 +123,106 @@
       "measured": 1.0,
       "expected": "rank ≤ 3",
       "pass": true
+    },
+    {
+      "case": "sindia-2021",
+      "status": "cropland",
+      "check": "classified as a fire on cropland",
+      "kind": "burning",
+      "measured": 0.0,
+      "expected": "crop_burning or cropland_fire",
+      "pass": false,
+      "verdict": "mixed: cropland 59%, natural vegetation 41%"
+    },
+    {
+      "case": "polizzi-2022",
+      "status": "cropland",
+      "check": "classified as a fire on cropland",
+      "kind": "burning",
+      "measured": null,
+      "expected": "crop_burning or cropland_fire",
+      "pass": false,
+      "verdict": "no detection inside the perimeter"
+    },
+    {
+      "case": "pietraperzia-2023",
+      "status": "cropland",
+      "check": "classified as a fire on cropland",
+      "kind": "burning",
+      "measured": 0.0,
+      "expected": "crop_burning or cropland_fire",
+      "pass": false,
+      "verdict": "mixed: cropland 71%, natural vegetation 29%"
+    },
+    {
+      "case": "aragona-2024",
+      "status": "cropland",
+      "check": "classified as a fire on cropland",
+      "kind": "burning",
+      "measured": 0.0,
+      "expected": "crop_burning or cropland_fire",
+      "pass": false,
+      "verdict": "mixed: cropland 62%, natural vegetation 38%"
+    },
+    {
+      "case": "irsina-2025",
+      "status": "cropland",
+      "check": "classified as a fire on cropland",
+      "kind": "burning",
+      "measured": 1.0,
+      "expected": "crop_burning or cropland_fire",
+      "pass": true,
+      "verdict": "cropland_fire: cropland 88%, natural vegetation 12%, 21 hotspots over 1 day"
+    },
+    {
+      "case": "san-luca-2021",
+      "status": "wildland",
+      "check": "classified as a wildfire",
+      "kind": "burning",
+      "measured": 1.0,
+      "expected": "wildfire",
+      "pass": true,
+      "verdict": "wildfire: natural vegetation 100%"
+    },
+    {
+      "case": "piazza-armerina-2022",
+      "status": "wildland",
+      "check": "classified as a wildfire",
+      "kind": "burning",
+      "measured": 1.0,
+      "expected": "wildfire",
+      "pass": true,
+      "verdict": "wildfire: natural vegetation 99%"
+    },
+    {
+      "case": "palermo-2023",
+      "status": "wildland",
+      "check": "classified as a wildfire",
+      "kind": "burning",
+      "measured": 1.0,
+      "expected": "wildfire",
+      "pass": true,
+      "verdict": "wildfire: natural vegetation 100%"
+    },
+    {
+      "case": "monte-verna-2024",
+      "status": "wildland",
+      "check": "classified as a wildfire",
+      "kind": "burning",
+      "measured": 1.0,
+      "expected": "wildfire",
+      "pass": true,
+      "verdict": "wildfire: natural vegetation 100%"
+    },
+    {
+      "case": "san-giovanni-rotondo-2025",
+      "status": "wildland",
+      "check": "classified as a wildfire",
+      "kind": "burning",
+      "measured": 1.0,
+      "expected": "wildfire",
+      "pass": true,
+      "verdict": "wildfire: natural vegetation 100%"
     }
   ]
 }

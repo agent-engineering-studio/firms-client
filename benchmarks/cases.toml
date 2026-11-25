@@ -12,7 +12,8 @@
 #
 # Status: fire (a wildfire, by an independent source), static (a hot thing
 # that is not a fire), false-fire (hot, typed as vegetation, not a fire),
-# blind (where FIRMS cannot say), season (a year among the others).
+# blind (where FIRMS cannot say), season (a year among the others),
+# cropland and wildland (what land burnt, by EFFIS: see the last cases).
 #
 # Check kinds:
 #   kept     the share of the rows select() keeps as vegetation fires; with
@@ -189,3 +190,206 @@ source = """EFFIS, cited by ANSA (25 August 2021): about 141,000 ha burnt in Ita
   name = "among the three worst years of 2012-2025"
   stat = "rank"
   max = 3
+
+# Crop burning or wildfire: the land under the fire, by EFFIS.
+#
+# The truth is the EFFIS burnt-area database (layer modis.ba.poly), mapped
+# from satellite images of the burnt area, not from FIRMS hotspots: every
+# perimeter carries the CORINE shares of the land that burnt. CC BY 4.0,
+# © European Union, 1995-2025 (https://forest-fire.emergency.copernicus.eu/about-effis/data-license).
+#
+# The rule that picked the cases, written before running the library: for
+# each fire season 2021-2025 in Italy, the largest perimeter of at least
+# 100 ha whose land was at least 90 % agricultural (AGRIAREAS), and the
+# largest whose land was at least 90 % natural (BROADLEA + CONIFER + MIXED +
+# SCLEROPH + TRANSIT + OTHERNATLC). The window is the perimeter's dates, one
+# day either side.
+#
+# EFFIS says what land burnt, not why: a fire on cropland may be stubble
+# burning or an accident, and stubble fires smaller than ~30 ha are not
+# mapped at all. So the agricultural cases ask for crop_burning or
+# cropland_fire, not for crop_burning alone.
+#
+#   burning  classify_burning on the select()-ed detections inside the
+#            perimeter, read on the WorldCover crop: 1 when its kind is in
+#            kinds, else 0; no detection inside is "not measured".
+
+[[case]]
+id = "sindia-2021"
+title = "Sindia, Sardinia, 12 July 2021: 914 ha, 95 % agricultural"
+status = "cropland"
+product = "viirs-snpp"
+year = 2021
+box = [8.64, 40.26, 8.72, 40.33]
+window = ["2021-07-11", "2021-07-13"]
+effis_id = "50687"
+source = """EFFIS burnt-area database, perimeter 50687: 914 ha from 2021-07-12 to 2021-07-12, \
+95 % agricultural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a fire on cropland"
+  kinds = ["crop_burning", "cropland_fire"]
+  min = 1
+
+[[case]]
+id = "polizzi-2022"
+title = "Polizzi Generosa, Sicily, 6 July 2022: 876 ha, 92 % agricultural"
+status = "cropland"
+product = "viirs-snpp"
+year = 2022
+box = [13.92, 37.65, 13.97, 37.72]
+window = ["2022-07-05", "2022-07-07"]
+effis_id = "204988"
+source = """EFFIS burnt-area database, perimeter 204988: 876 ha from 2022-07-06 to 2022-07-06, \
+92 % agricultural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a fire on cropland"
+  kinds = ["crop_burning", "cropland_fire"]
+  min = 1
+
+[[case]]
+id = "pietraperzia-2023"
+title = "Pietraperzia, Sicily, 25 July 2023: 359 ha, 94 % agricultural"
+status = "cropland"
+product = "viirs-snpp"
+year = 2023
+box = [14.06, 37.37, 14.11, 37.41]
+window = ["2023-07-24", "2023-07-26"]
+effis_id = "217562"
+source = """EFFIS burnt-area database, perimeter 217562: 359 ha from 2023-07-25 to 2023-07-25, \
+94 % agricultural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a fire on cropland"
+  kinds = ["crop_burning", "cropland_fire"]
+  min = 1
+
+[[case]]
+id = "aragona-2024"
+title = "Aragona, Sicily, 30-31 July 2024: 659 ha, 91 % agricultural"
+status = "cropland"
+product = "viirs-snpp"
+year = 2024
+box = [13.6, 37.42, 13.66, 37.47]
+window = ["2024-07-29", "2024-08-01"]
+effis_id = "236242"
+source = """EFFIS burnt-area database, perimeter 236242: 659 ha from 2024-07-30 to 2024-07-31, \
+91 % agricultural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a fire on cropland"
+  kinds = ["crop_burning", "cropland_fire"]
+  min = 1
+
+[[case]]
+id = "irsina-2025"
+title = "Irsina, Basilicata, 3 July 2025: 571 ha, 95 % agricultural"
+status = "cropland"
+product = "viirs-snpp"
+year = 2025
+box = [16.21, 40.79, 16.27, 40.84]
+window = ["2025-07-02", "2025-07-04"]
+effis_id = "273364"
+source = """EFFIS burnt-area database, perimeter 273364: 571 ha from 2025-07-03 to 2025-07-03, \
+95 % agricultural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a fire on cropland"
+  kinds = ["crop_burning", "cropland_fire"]
+  min = 1
+
+[[case]]
+id = "san-luca-2021"
+title = "San Luca, Aspromonte, 7-10 August 2021: 850 ha, 100 % natural"
+status = "wildland"
+product = "viirs-snpp"
+year = 2021
+box = [15.94, 38.1, 16.02, 38.16]
+window = ["2021-08-06", "2021-08-11"]
+effis_id = "52111"
+source = """EFFIS burnt-area database, perimeter 52111: 850 ha from 2021-08-07 to 2021-08-10, \
+100 % natural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a wildfire"
+  kinds = ["wildfire"]
+  min = 1
+
+[[case]]
+id = "piazza-armerina-2022"
+title = "Piazza Armerina, Sicily, 2-6 July 2022: 1034 ha, 92 % natural"
+status = "wildland"
+product = "viirs-snpp"
+year = 2022
+box = [14.36, 37.39, 14.42, 37.45]
+window = ["2022-07-01", "2022-07-07"]
+effis_id = "204496"
+source = """EFFIS burnt-area database, perimeter 204496: 1034 ha from 2022-07-02 to 2022-07-06, \
+92 % natural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a wildfire"
+  kinds = ["wildfire"]
+  min = 1
+
+[[case]]
+id = "palermo-2023"
+title = "Palermo, 27 July 2023: 1663 ha, 91 % natural"
+status = "wildland"
+product = "viirs-snpp"
+year = 2023
+box = [13.3, 38.03, 13.42, 38.1]
+window = ["2023-07-26", "2023-07-28"]
+effis_id = "217929"
+source = """EFFIS burnt-area database, perimeter 217929: 1663 ha from 2023-07-27 to 2023-07-27, \
+91 % natural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a wildfire"
+  kinds = ["wildfire"]
+  min = 1
+
+[[case]]
+id = "monte-verna-2024"
+title = "Piana di Monte Verna, Campania, 11-12 August 2024: 542 ha, 99 % natural"
+status = "wildland"
+product = "viirs-snpp"
+year = 2024
+box = [14.28, 41.16, 14.34, 41.2]
+window = ["2024-08-10", "2024-08-13"]
+effis_id = "237683"
+source = """EFFIS burnt-area database, perimeter 237683: 542 ha from 2024-08-11 to 2024-08-12, \
+99 % natural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a wildfire"
+  kinds = ["wildfire"]
+  min = 1
+
+[[case]]
+id = "san-giovanni-rotondo-2025"
+title = "San Giovanni Rotondo, Gargano, 21-24 July 2025: 1173 ha, 100 % natural"
+status = "wildland"
+product = "viirs-snpp"
+year = 2025
+box = [15.67, 41.7, 15.76, 41.76]
+window = ["2025-07-20", "2025-07-25"]
+effis_id = "275990"
+source = """EFFIS burnt-area database, perimeter 275990: 1173 ha from 2025-07-21 to 2025-07-24, \
+100 % natural land (CORINE). © European Union, 1995-2025, CC BY 4.0."""
+
+  [[case.check]]
+  kind = "burning"
+  name = "classified as a wildfire"
+  kinds = ["wildfire"]
+  min = 1

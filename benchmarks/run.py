@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import itertools
 import json
 import math
 import sys
@@ -91,12 +92,46 @@ def _season(case: dict[str, Any], check: dict[str, Any]) -> float | None:
     return float(getattr(found, check["stat"]))
 
 
+def inside(lon: float, lat: float, geometry: dict[str, Any]) -> bool:
+    """Whether a point is inside a GeoJSON Polygon or MultiPolygon (even-odd rule)."""
+    polygons = (
+        [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+    )
+    hit = False
+    for rings in polygons:
+        for ring in rings:
+            for (x0, y0), (x1, y1) in itertools.pairwise(ring):
+                if (y0 > lat) != (y1 > lat) and lon < x0 + (lat - y0) * (x1 - x0) / (y1 - y0):
+                    hit = not hit
+    return hit
+
+
+#: The verdict of each burning check, shown beside its 0 or 1.
+VERDICTS: dict[str, str] = {}
+
+
+def _burning(case: dict[str, Any], check: dict[str, Any]) -> float | None:
+    from firms_client import FireEvent, WorldCover, classify_burning, select
+
+    folder = DATA / case["id"]
+    geometry = json.loads((folder / "perimeter.geojson").read_text())["geometry"]
+    rows = [h for h in select(_rows(case)) if inside(h.longitude, h.latitude, geometry)]
+    if not rows:
+        VERDICTS[case["id"]] = "no detection inside the perimeter"
+        return None
+    with WorldCover(str(folder / "worldcover")) as land:
+        verdict = classify_burning(FireEvent.of(rows), land)
+    VERDICTS[case["id"]] = f"{verdict.kind}: {verdict.reason}"
+    return float(verdict.kind in check["kinds"])
+
+
 METHODS: dict[str, Callable[[dict[str, Any], dict[str, Any]], float | None]] = {
     "kept": _kept,
     "events": _events,
     "event": _event,
     "summary": _summary,
     "season": _season,
+    "burning": _burning,
 }
 
 
@@ -125,6 +160,7 @@ def score() -> list[dict[str, Any]]:
                     "measured": None if measured is None else round(measured, DIGITS),
                     "expected": _expected(check),
                     "pass": passes(check, measured),
+                    **({"verdict": VERDICTS[case["id"]]} if check["kind"] == "burning" else {}),
                 }
             )
     return rows
@@ -133,6 +169,8 @@ def score() -> list[dict[str, Any]]:
 def _expected(check: dict[str, Any]) -> str:
     if check.get("none"):
         return "not measured"
+    if check["kind"] == "burning":
+        return " or ".join(check["kinds"])
     stat = {"kept": "share kept", "events": "events"}.get(check["kind"]) or check["stat"]
     low, high = check.get("min"), check.get("max")
     if low is not None and high is not None:
@@ -144,6 +182,8 @@ def markdown(rows: list[dict[str, Any]]) -> str:
     lines = ["| Case | Check | Expected | Measured | |", "|---|---|---|---|---|"]
     for r in rows:
         measured = "not measured" if r["measured"] is None else f"{r['measured']:g}"
+        if "verdict" in r:
+            measured = r["verdict"]
         mark = "✅" if r["pass"] else "❌"
         lines.append(f"| {r['case']} | {r['check']} | {r['expected']} | {measured} | {mark} |")
     passed = sum(r["pass"] for r in rows)

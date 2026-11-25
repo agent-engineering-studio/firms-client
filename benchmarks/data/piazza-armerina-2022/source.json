@@ -1,0 +1,8 @@
+{
+  "archive": "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2022/viirs-snpp_2022_Italy.csv",
+  "sha256": "77da4dea167ae7cef3ac02c9fccede7bb212a288dd2cabe788a0a97ecaefa4de",
+  "rows": 86,
+  "fetched": "2026-11-25",
+  "perimeter": "https://maps.effis.emergency.copernicus.eu/effis ms:modis.ba.poly id=204496",
+  "land_cover": "ESA WorldCover 2021 v200 (CC BY 4.0)"
+}
