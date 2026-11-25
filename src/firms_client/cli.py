@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
+import io
 import json
 import os
 import sys
@@ -32,6 +34,7 @@ import httpx
 
 from firms_client import __version__
 from firms_client.anomaly import season_anomaly
+from firms_client.cells import CellStats, LaeaGrid, cell_stats
 from firms_client.client import (
     ENV_MAP_KEY,
     fetch_archive,
@@ -41,7 +44,7 @@ from firms_client.client import (
 )
 from firms_client.errors import FirmsError
 from firms_client.export import to_csv, to_geojson
-from firms_client.hotspots import Hotspot, select
+from firms_client.hotspots import Hotspot, select, within
 from firms_client.mask import fetch_static_mask
 from firms_client.reliability import Reliability, seen, trust
 from firms_client.retry import RetryPolicy
@@ -164,6 +167,22 @@ def _parser() -> argparse.ArgumentParser:
     trust_.add_argument("--area-ha", type=float, help="also: how often FIRMS sees a fire this big")
     trust_.add_argument("--format", choices=("summary", "json"), default="summary", dest="fmt")
 
+    cells = commands.add_parser(
+        "cells", help="fire-days per 1 km cell (ETRS89-LAEA), land under the fires, static sources"
+    )
+    cells.add_argument("country")
+    cells.add_argument("first_year", type=int)
+    cells.add_argument("last_year", type=int, nargs="?", help="default: first_year")
+    cells.add_argument("--bbox", type=_bbox, metavar="W,S,E,N", help="one region of it")
+    cells.add_argument("--product", choices=sorted(_PRODUCTS), default="viirs-snpp")
+    cells.add_argument("--size-m", type=float, default=1000.0, help="cell side, metres")
+    cells.add_argument("--mask", action="store_true", help="use the country's static-source mask")
+    cells.add_argument(
+        "--land", action="store_true", help="land under the fires (WorldCover, landcover extra)"
+    )
+    cells.add_argument("--dir", type=Path, help="data directory (default: FIRMS_DATA_DIR)")
+    cells.add_argument("--format", choices=("csv", "json"), default="csv", dest="fmt")
+
     status = commands.add_parser(
         "status", help="what FIRMS has and lacks: latest archives, days with no data, the key"
     )
@@ -265,6 +284,71 @@ async def _trust(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
     return "\n".join(lines) + "\n"
 
 
+_CELL_COLUMNS = (
+    "code",
+    "latitude",
+    "longitude",
+    "measured",
+    "detections",
+    "fire_days",
+    "fire_days_per_km2",
+    "cropland",
+    "natural",
+    "land_days",
+    "static_km",
+    "score",
+    "reason",
+)
+
+
+async def _cells(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
+    product = _PRODUCTS[args.product]
+    rows: list[Hotspot] = []
+    for year in range(args.first_year, (args.last_year or args.first_year) + 1):
+        found = await fetch_archive(
+            client, product, year, args.country, directory=args.dir, retry=RetryPolicy()
+        )
+        if found is None:
+            raise UsageError(f"no {product.slug} archive for {args.country} in {year}")
+        rows.extend(found)
+    if args.bbox is not None:
+        rows = within(rows, args.bbox)
+    rows = select(rows, vegetation_only=False)
+    mask = None
+    if args.mask:
+        mask = await fetch_static_mask(
+            client, args.country, directory=args.dir, retry=RetryPolicy()
+        )
+    grid = LaeaGrid(size_m=args.size_m)
+
+    def count() -> dict[tuple[int, int], CellStats[tuple[int, int]]]:
+        if not args.land:
+            return cell_stats(rows, grid, mask=mask)
+        from firms_client.landcover import WorldCover
+
+        with WorldCover.synced(args.dir) as land:
+            return cell_stats(rows, grid, mask=mask, land=land)
+
+    stats = await asyncio.to_thread(count)
+    out = []
+    for cell, row in sorted(stats.items()):
+        lat, lon = grid.centre(cell)
+        record = {
+            k: round(v, 4) if isinstance(v, float) else v
+            for k, v in row.as_dict().items()
+            if k not in ("cell", "area_km2")
+        }
+        code = grid.code(cell) if args.size_m % 1000 == 0 else f"{cell[0]}_{cell[1]}"
+        out.append({"code": code, "latitude": round(lat, 5), "longitude": round(lon, 5), **record})
+    if args.fmt == "json":
+        return json.dumps(out, indent=2) + "\n"
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=_CELL_COLUMNS, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(out)
+    return buffer.getvalue()
+
+
 async def _status(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
     retry = RetryPolicy()
     latest = {
@@ -351,6 +435,8 @@ def main(
                 return await _sync(args, client)
             if args.command == "trust":
                 return await _trust(args, client)
+            if args.command == "cells":
+                return await _cells(args, client)
             if args.command == "status":
                 return await _status(args, client)
             return _render(args, await _rows(args, client))

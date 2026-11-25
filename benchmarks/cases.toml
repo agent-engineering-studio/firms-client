@@ -32,6 +32,12 @@
 #            and WorldCover crop when it has them: its score, 0 to 1
 #            (reliable from 0.5). Static sources, lava and water must score
 #            below, natural land above; with nothing known, not measured.
+#   cells    cell_stats() of the detections inside an EFFIS perimeter, on
+#            the 1 km ETRS89-LAEA grid, with the case's WorldCover crop: the
+#            WorldCover cropland under the fire-days, weighted by fire-days.
+#            EFFIS gives the perimeter's agricultural share (CORINE): 90 % or
+#            more must read as mostly cropland (≥ 0.5; WorldCover calls
+#            pasture grassland), natural land as almost none (≤ 0.1).
 
 [[case]]
 id = "montiferru"
@@ -258,6 +264,11 @@ source = """EFFIS burnt-area database, perimeter 50687: 914 ha from 2021-07-12 t
   kinds = ["crop_burning", "cropland_fire"]
   min = 1
 
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: mostly cropland under the fire-days"
+  min = 0.5
+
 [[case]]
 id = "polizzi-2022"
 title = "Polizzi Generosa, Sicily, 6 July 2022: 876 ha, 92 % agricultural"
@@ -275,6 +286,11 @@ source = """EFFIS burnt-area database, perimeter 204988: 876 ha from 2022-07-06 
   name = "classified as a fire on cropland"
   kinds = ["crop_burning", "cropland_fire"]
   min = 1
+
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: mostly cropland under the fire-days"
+  min = 0.5
 
 [[case]]
 id = "pietraperzia-2023"
@@ -294,6 +310,11 @@ source = """EFFIS burnt-area database, perimeter 217562: 359 ha from 2023-07-25 
   kinds = ["crop_burning", "cropland_fire"]
   min = 1
 
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: mostly cropland under the fire-days"
+  min = 0.5
+
 [[case]]
 id = "aragona-2024"
 title = "Aragona, Sicily, 30-31 July 2024: 659 ha, 91 % agricultural"
@@ -312,6 +333,11 @@ source = """EFFIS burnt-area database, perimeter 236242: 659 ha from 2024-07-30 
   kinds = ["crop_burning", "cropland_fire"]
   min = 1
 
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: mostly cropland under the fire-days"
+  min = 0.5
+
 [[case]]
 id = "irsina-2025"
 title = "Irsina, Basilicata, 3 July 2025: 571 ha, 95 % agricultural"
@@ -329,6 +355,11 @@ source = """EFFIS burnt-area database, perimeter 273364: 571 ha from 2025-07-03 
   name = "classified as a fire on cropland"
   kinds = ["crop_burning", "cropland_fire"]
   min = 1
+
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: mostly cropland under the fire-days"
+  min = 0.5
 
 [[case]]
 id = "san-luca-2021"
@@ -353,6 +384,11 @@ source = """EFFIS burnt-area database, perimeter 52111: 850 ha from 2021-08-07 t
   name = "natural land: a detection here can be read as a fire"
   min = 0.5
 
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: almost no cropland under the fire-days"
+  max = 0.1
+
 [[case]]
 id = "piazza-armerina-2022"
 title = "Piazza Armerina, Sicily, 2-6 July 2022: 1034 ha, 92 % natural"
@@ -375,6 +411,11 @@ source = """EFFIS burnt-area database, perimeter 204496: 1034 ha from 2022-07-02
   kind = "reliable"
   name = "natural land: a detection here can be read as a fire"
   min = 0.5
+
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: almost no cropland under the fire-days"
+  max = 0.1
 
 [[case]]
 id = "palermo-2023"
@@ -399,6 +440,11 @@ source = """EFFIS burnt-area database, perimeter 217929: 1663 ha from 2023-07-27
   name = "natural land: a detection here can be read as a fire"
   min = 0.5
 
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: almost no cropland under the fire-days"
+  max = 0.1
+
 [[case]]
 id = "monte-verna-2024"
 title = "Piana di Monte Verna, Campania, 11-12 August 2024: 542 ha, 99 % natural"
@@ -422,6 +468,11 @@ source = """EFFIS burnt-area database, perimeter 237683: 542 ha from 2024-08-11 
   name = "natural land: a detection here can be read as a fire"
   min = 0.5
 
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: almost no cropland under the fire-days"
+  max = 0.1
+
 [[case]]
 id = "san-giovanni-rotondo-2025"
 title = "San Giovanni Rotondo, Gargano, 21-24 July 2025: 1173 ha, 100 % natural"
@@ -444,3 +495,8 @@ source = """EFFIS burnt-area database, perimeter 275990: 1173 ha from 2025-07-21
   kind = "reliable"
   name = "natural land: a detection here can be read as a fire"
   min = 0.5
+
+  [[case.check]]
+  kind = "cells"
+  name = "per cell: almost no cropland under the fire-days"
+  max = 0.1

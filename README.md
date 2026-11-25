@@ -497,20 +497,38 @@ async def history(client: httpx.AsyncClient, country: str) -> dict[int, int]:
 
 ### Fire-days per square kilometre
 
-Run it with and without `select()` to find your country's steelworks:
+`cell_stats` counts the distinct days with a vegetation fire in each cell of
+a grid. `LaeaGrid()` is the 1 km EEA reference grid (ETRS89-LAEA, EPSG:3035),
+computed with no extra dependency; any object with `cell_of`, `area_km2` and
+`centre` will do, so a model's own grid works too:
 
 ```python
-from collections import defaultdict
+from firms_client import LaeaGrid, cell_stats, select
 
-days: dict[tuple[float, float], set[date]] = defaultdict(set)
-for year in archive_years(VIIRS_SNPP, until=2025):
-    for r in await fetch_archive(client, VIIRS_SNPP, year, "Italy") or []:
-        days[round(r.latitude, 2), round(r.longitude, 2)].add(r.acq_date)
+rows = []
+for year in range(2016, 2026):
+    rows += await fetch_archive(client, VIIRS_SNPP, year, "Italy") or []
+mask = await fetch_static_mask(client, "Italy")
+grid = LaeaGrid()
 
-hottest = sorted(days.items(), key=lambda kv: len(kv[1]), reverse=True)[:5]
-for (lat, lon), d in hottest:
-    print(f"{lat:.2f}, {lon:.2f}: {len(d)} fire-days")
+with WorldCover.synced() as land:  # firms sync Italy --worldcover … first
+    stats = cell_stats(select(rows, vegetation_only=False), grid, mask=mask, land=land)
+
+for cell, s in sorted(stats.items(), key=lambda kv: -(kv[1].fire_days or 0))[:5]:
+    print(grid.code(cell), s.fire_days, "fire-days,", f"cropland {s.cropland:.0%}")
 ```
+
+Each `CellStats` has `fire_days`, `fire_days_per_km2`, `cropland` and
+`natural` (the WorldCover share under the fire-days, 0 to 1), `static_km`
+(the distance to the nearest static source of the mask) and `score` (`trust`
+at the centre). **`None` is not measured, never 0**: a cell on a static
+source of the mask is not measured, and with no land cover or no fire-day
+`cropland` is `None`. Pass `cells=` with the whole grid to get the zeros.
+Rows with no `type` (the area API) are skipped unless `include_untyped=True`:
+label them with the mask first. Without `select()` and without the `type`
+filter, the top of the list would be your country's steelworks.
+
+From a shell: `firms cells Italy 2024 2025 --mask --land > cells.csv`.
 
 ### A monthly chart
 
@@ -847,12 +865,13 @@ mask), why a field burnt, other countries (the table is Italy's).
 
 ## Known cases: what the library gets right, and what it does not
 
-Thirty-one checks on places and seasons where a source independent of
+Forty-one checks on places and seasons where a source independent of
 FIRMS says what happened: two wildfires (Montiferru 2021, Palermo 2023), a
 steelworks (Taranto), a lava flow (Etna, February 2025), the open sea, the
 two worst Italian seasons in the archives (2017 and 2021, by EFFIS), and ten
 burnt areas of the EFFIS database whose land was at least 90 % agricultural
-or 90 % natural; on eight of them, `trust()` too. The expected ranges come
+or 90 % natural; on eight of them, `trust()` too, and on all ten the
+cropland under the fire-days per 1 km cell (`cell_stats()`). The expected ranges come
 from each source, never from FIRMS; a check that fails stays in the table.
 
 | Case | Check | Expected | Measured | |
@@ -874,22 +893,32 @@ from each source, never from FIRMS; a check that fails stays in the table.
 | season-2021 | among the three worst years of 2012-2025 | rank ≤ 3 | 3 | ✅ |
 | season-2017 | among the three worst years of 2012-2025 | rank ≤ 3 | 1 | ✅ |
 | sindia-2021 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 59%, natural vegetation 41% | ❌ |
+| sindia-2021 | per cell: mostly cropland under the fire-days | cropland under the fire-days ≥ 0.5 | 0.593 | ✅ |
 | polizzi-2022 | classified as a fire on cropland | crop_burning or cropland_fire | no detection inside the perimeter | ❌ |
+| polizzi-2022 | per cell: mostly cropland under the fire-days | cropland under the fire-days ≥ 0.5 | not measured | ❌ |
 | pietraperzia-2023 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 71%, natural vegetation 29% | ❌ |
+| pietraperzia-2023 | per cell: mostly cropland under the fire-days | cropland under the fire-days ≥ 0.5 | 0.707 | ✅ |
 | aragona-2024 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 62%, natural vegetation 38% | ❌ |
+| aragona-2024 | per cell: mostly cropland under the fire-days | cropland under the fire-days ≥ 0.5 | 0.578 | ✅ |
 | irsina-2025 | classified as a fire on cropland | crop_burning or cropland_fire | cropland_fire: cropland 88%, natural vegetation 12%, 21 hotspots over 1 day | ✅ |
+| irsina-2025 | per cell: mostly cropland under the fire-days | cropland under the fire-days ≥ 0.5 | 0.86 | ✅ |
 | san-luca-2021 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
 | san-luca-2021 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
+| san-luca-2021 | per cell: almost no cropland under the fire-days | cropland under the fire-days ≤ 0.1 | 0 | ✅ |
 | piazza-armerina-2022 | classified as a wildfire | wildfire | wildfire: natural vegetation 99% | ✅ |
 | piazza-armerina-2022 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
+| piazza-armerina-2022 | per cell: almost no cropland under the fire-days | cropland under the fire-days ≤ 0.1 | 0.004 | ✅ |
 | palermo-2023 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
 | palermo-2023 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
+| palermo-2023 | per cell: almost no cropland under the fire-days | cropland under the fire-days ≤ 0.1 | 0 | ✅ |
 | monte-verna-2024 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
 | monte-verna-2024 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
+| monte-verna-2024 | per cell: almost no cropland under the fire-days | cropland under the fire-days ≤ 0.1 | 0 | ✅ |
 | san-giovanni-rotondo-2025 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
 | san-giovanni-rotondo-2025 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
+| san-giovanni-rotondo-2025 | per cell: almost no cropland under the fire-days | cropland under the fire-days ≤ 0.1 | 0 | ✅ |
 
-**25 of 31** checks pass.
+**34 of 41** checks pass.
 
 What the failures say:
 
@@ -905,6 +934,10 @@ What the failures say:
   inside the perimeter (Sindia, Pietraperzia), Aragona on fifteen. Wildfires on natural land are right 5 of 5. The thresholds are
   not changed here: tuned on these cases, they would test nothing; they
   will be fitted on the perimeters of earlier years and tested on these.
+  The continuous share does what the rule cannot: per 1 km cell
+  (`cell_stats()`), the cropland under the fire-days is 0.58-0.86 on the
+  four agricultural fires FIRMS saw and 0-0.004 on the five wildfires. A
+  model can use that number; a yes-or-no label throws it away.
 - **A fire FIRMS missed**: Polizzi Generosa, 6 July 2022, 876 ha by EFFIS,
   and not one VIIRS S-NPP detection inside the perimeter in three days
   (Sindia, 914 ha, has three). The library cannot classify what it did not
@@ -997,6 +1030,8 @@ All checked against the live service on 3 November 2026.
 | `Hotspot`, `FireEvent`, `ArchiveProduct`, `BBox`, `ConfidenceLevel` | types | |
 | `ATTRIBUTION`, `TYPE_NAMES` | constants | the NASA acknowledgement, names for `type` |
 | `within(hotspots, bbox)` | pure | the hotspots inside a bbox: one region of a country |
+| `cell_stats(hotspots, grid, *, cells, mask, land)` → `{cell: CellStats}` | pure | fire-days, land under the fires and distance from static sources, per cell |
+| `LaeaGrid(size_m=1000, origin=(0, 0))`, `DegreeGrid(step)`, `Grid`, `laea`, `laea_inverse` | pure | the EEA 1 km grid (ETRS89-LAEA) and degree grids, no pyproj |
 | `firms_client.mcp_server` | extra `[mcp]` | `firms-mcp`, `build_server()`, and the tool logic as plain async functions |
 | `FirmsError` | exception | FIRMS answered, but not with a hotspot CSV |
 
