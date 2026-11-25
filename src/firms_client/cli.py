@@ -7,10 +7,12 @@
     firms anomaly Italy 2025 --month 7
     firms sync Italy --worldcover 16.4,40.5,16.8,40.8     # once, before a server starts
     firms trust 40.51 17.20 --country Italy               # a detection here: a fire?
+    firms status Italy                                    # what FIRMS has, lacks, and the key
 
 Results go to stdout (``--format summary``, ``json`` for the
 :func:`~firms_client.summarize` digest, ``csv`` or ``geojson``),
-messages to stderr. The MAP_KEY comes from ``--key`` or ``FIRMS_MAP_KEY``.
+messages to stderr. The MAP_KEY comes from ``--key``, else ``FIRMS_MAP_KEY`` in the
+environment or in the ``.env`` of the current directory; so does ``FIRMS_DATA_DIR``.
 Requests are retried on 429, 5xx and dropped connections.
 """
 
@@ -23,20 +25,32 @@ import os
 import sys
 from collections import Counter
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import httpx
 
 from firms_client import __version__
 from firms_client.anomaly import season_anomaly
-from firms_client.client import fetch_archive, fetch_area, fetch_area_range
+from firms_client.client import (
+    ENV_MAP_KEY,
+    fetch_archive,
+    fetch_area,
+    fetch_area_range,
+    map_key_from_env,
+)
 from firms_client.errors import FirmsError
 from firms_client.export import to_csv, to_geojson
 from firms_client.hotspots import Hotspot, select
 from firms_client.mask import fetch_static_mask
 from firms_client.reliability import Reliability, seen, trust
 from firms_client.retry import RetryPolicy
+from firms_client.service import (
+    data_availability,
+    latest_archive,
+    map_key_status,
+    missing_days,
+)
 from firms_client.sources import (
     ARCHIVE_PRODUCTS,
     MAX_AREA_DAYS,
@@ -48,7 +62,6 @@ from firms_client.summary import summarize
 from firms_client.sync import sync
 
 #: The environment variable ``firms area`` reads the MAP_KEY from.
-ENV_MAP_KEY = "FIRMS_MAP_KEY"
 
 _TYPES = {0: "vegetation fire", 1: "active volcano", 2: "static land source", 3: "offshore"}
 _PRODUCTS = {p.slug: p for p in ARCHIVE_PRODUCTS}
@@ -150,6 +163,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     trust_.add_argument("--area-ha", type=float, help="also: how often FIRMS sees a fire this big")
     trust_.add_argument("--format", choices=("summary", "json"), default="summary", dest="fmt")
+
+    status = commands.add_parser(
+        "status", help="what FIRMS has and lacks: latest archives, days with no data, the key"
+    )
+    status.add_argument("country")
+    status.add_argument("--days", type=int, default=30, help="days with no data, looking back")
+    status.add_argument("--key", help=f"MAP_KEY (default: ${ENV_MAP_KEY}, or .env)")
+    status.add_argument("--format", choices=("summary", "json"), default="summary", dest="fmt")
     return parser
 
 
@@ -244,6 +265,48 @@ async def _trust(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
     return "\n".join(lines) + "\n"
 
 
+async def _status(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
+    retry = RetryPolicy()
+    latest = {
+        p.slug: await latest_archive(client, p, args.country, retry=retry)
+        for p in _PRODUCTS.values()
+    }
+    missing = await missing_days(client, retry=retry)
+    since = date.today() - timedelta(days=args.days)
+    gaps: dict[str, dict[str, list[str]]] = {}
+    for kind, table in (("standard", missing.standard), ("near_real_time", missing.near_real_time)):
+        for sat, days in table.items():
+            recent = sorted(d.isoformat() for d in days if d >= since)
+            if recent:
+                gaps.setdefault(kind, {})[sat] = recent
+    key = args.key or map_key_from_env()
+    status = await map_key_status(client, key, retry=retry) if key else None
+    available = await data_availability(client, key, retry=retry) if key else None
+    if args.fmt == "json":
+        report = {
+            "country": args.country,
+            "latest_archive": latest,
+            "no_data_days": gaps,
+            "map_key": status,
+            "data_availability": available,
+        }
+        return json.dumps(report, indent=2) + "\n"
+    lines = [f"{args.country}: latest country archive"]
+    lines += [f"  {slug}: {year}" for slug, year in latest.items()]
+    lines.append(f"days with no data in the last {args.days}:")
+    if not gaps:
+        lines.append("  none")
+    for kind, sats in gaps.items():
+        for sat, dates in sats.items():
+            lines.append(f"  {sat} ({kind}): {len(dates)}, {dates[0]} to {dates[-1]}")
+    if status is None or available is None:
+        lines.append(f"MAP_KEY: not set (${ENV_MAP_KEY} or .env): key checks skipped")
+    else:
+        lines.append(f"MAP_KEY: {json.dumps(status)}")
+        lines += ["  " + ", ".join(f"{k} {v}" for k, v in row.items()) for row in available]
+    return "\n".join(lines) + "\n"
+
+
 async def _rows(args: argparse.Namespace, client: httpx.AsyncClient) -> list[Hotspot]:
     retry = RetryPolicy()
     if args.command == "archive":
@@ -252,7 +315,7 @@ async def _rows(args: argparse.Namespace, client: httpx.AsyncClient) -> list[Hot
         if rows is None:
             raise UsageError(f"{product.slug} {args.year} is not published for {args.country}")
         return rows
-    key = args.key or os.environ.get(ENV_MAP_KEY, "").strip()
+    key = args.key or map_key_from_env()
     if not key:
         raise UsageError(f"a MAP_KEY is needed: --key or ${ENV_MAP_KEY}")
     if (args.start is None) != (args.end is None):
@@ -288,6 +351,8 @@ def main(
                 return await _sync(args, client)
             if args.command == "trust":
                 return await _trust(args, client)
+            if args.command == "status":
+                return await _status(args, client)
             return _render(args, await _rows(args, client))
 
     try:

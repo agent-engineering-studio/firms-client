@@ -10,3 +10,5 @@ htmlcov/
 .ruff_cache/
 .venv-core/
 _site/
+.env
+/data/

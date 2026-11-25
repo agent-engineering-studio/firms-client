@@ -36,20 +36,54 @@ if TYPE_CHECKING:
 
 #: The environment variable :func:`default_directory` reads.
 ENV_DATA_DIR = "FIRMS_DATA_DIR"
+#: The environment variable the MAP_KEY is read from (:func:`map_key_from_env`).
+ENV_MAP_KEY = "FIRMS_MAP_KEY"
 
 _CHUNK = 1 << 16
 
 
 def default_directory() -> Path:
-    """Where archives go when no directory is given.
+    """The data directory: every download goes there, and is read from there.
 
-    ``FIRMS_DATA_DIR`` if set, else ``firms-client`` in the user cache
-    (``$XDG_CACHE_HOME``, or ``~/.cache``).
+    ``FIRMS_DATA_DIR`` from the environment; else from a ``.env`` file in the
+    current directory (``FIRMS_DATA_DIR=/data/firms``), so a project that
+    keeps its settings there needs nothing else; else ``firms-client`` in the
+    user cache (``$XDG_CACHE_HOME``, or ``~/.cache``). Archives, the static
+    mask, the WorldCover copy and ``sync.json`` all live in it.
     """
-    if configured := os.environ.get(ENV_DATA_DIR, "").strip():
+    configured = os.environ.get(ENV_DATA_DIR, "").strip() or env_file_value(ENV_DATA_DIR)
+    if configured:
         return Path(configured).expanduser()
     cache = os.environ.get("XDG_CACHE_HOME", "").strip() or "~/.cache"
     return Path(cache).expanduser() / "firms-client"
+
+
+def map_key_from_env() -> str | None:
+    """``FIRMS_MAP_KEY`` from the environment, else from the current directory's ``.env``."""
+    return os.environ.get(ENV_MAP_KEY, "").strip() or env_file_value(ENV_MAP_KEY)
+
+
+def env_file_value(name: str, path: Path | None = None) -> str | None:
+    """The value of ``name`` in a ``.env`` file (default: the current directory's).
+
+    Plain ``NAME=value`` lines; ``export``, quotes and ``#`` comments are
+    understood. The environment is not changed.
+    """
+    path = path or Path.cwd() / ".env"
+    if not path.is_file():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip().removeprefix("export ").strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        if key.strip() != name:
+            continue
+        value = value.strip()
+        if value[:1] in "\"'" and value[:1] == value[-1:] and len(value) > 1:
+            return value[1:-1]
+        return value.split(" #", 1)[0].strip() or None
+    return None
 
 
 async def download_archive(

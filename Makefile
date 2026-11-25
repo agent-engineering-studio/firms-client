@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help check lint format typecheck test test-core build docs bench bench-data clean
+.PHONY: help check lint format typecheck test test-core live build docs bench bench-data clean
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -34,6 +34,11 @@ bench: ## Score the known cases offline, as CI does: any change from results.jso
 bench-data: ## Download and crop the data of the known cases again, then score them
 	uv run --all-extras python -m benchmarks.fetch
 	uv run --all-extras python -m benchmarks.run
+
+# The real service: the archive's columns, the missing-data table and, with
+# FIRMS_MAP_KEY (environment or .env), the key and a day of the area API.
+live: ## Test against the real FIRMS service, as the weekly CI job does
+	uv run pytest -m live -v
 
 build: ## The wheel and the sdist, in dist/
 	uv build

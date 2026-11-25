@@ -26,8 +26,10 @@ down gives its reason. With no part known the place is **not measured**:
 :func:`seen` says how often it sees a fire of a given size: the share of the
 EFFIS burnt areas of a country with at least one detection inside, measured
 by ``tools/build_detection.py`` and shipped as ``data/detection.json``. In
-Italy, 2022-2025, VIIRS S-NPP saw 19 % of the fires under 30 ha and 82 % of
-those of 300 to 1,000 ha. No detection is not no fire.
+Italy, 2022-2025, VIIRS S-NPP saw 20 % of the fires under 30 ha and 87 % of
+those of 300 to 1,000 ha. Fires on days with no S-NPP data in FIRMS
+(:func:`~firms_client.missing_days`) are left out of the shares and counted
+apart, as ``no_data``. No detection is not no fire.
 
 The thresholds are choices, stated here and checked on the benchmark of
 known places (``benchmarks/``). What the estimate cannot see, and does not
@@ -179,6 +181,7 @@ class Seen:
     period: str
     perimeters: int
     seen: int
+    no_data: int
     country: str
     product: str
 
@@ -225,6 +228,7 @@ def seen(area_ha: float, *, period: str = LATEST) -> Seen:
         period=period,
         perimeters=counts["perimeters"],
         seen=counts["seen"],
+        no_data=counts.get("no_data", 0),
         country=table["country"],
         product=table["product"],
     )
