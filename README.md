@@ -714,11 +714,13 @@ rows = parse_csv(requests.get(url, timeout=120).text)
 
 ## Known cases: what the library gets right, and what it does not
 
-Thirteen checks on places and seasons where an independent source says what
-happened: a wildfire (Montiferru 2021, Palermo 2023), a steelworks (Taranto),
-a lava flow (Etna, February 2025), the open sea, and the two worst Italian
-seasons in the archives (2017 and 2021, by EFFIS). The expected ranges come
-from each source, never from FIRMS; a check that fails stays in the table.
+Twenty-three checks on places and seasons where a source independent of
+FIRMS says what happened: two wildfires (Montiferru 2021, Palermo 2023), a
+steelworks (Taranto), a lava flow (Etna, February 2025), the open sea, the
+two worst Italian seasons in the archives (2017 and 2021, by EFFIS), and ten
+burnt areas of the EFFIS database whose land was at least 90 % agricultural
+or 90 % natural. The expected ranges come from each source, never from
+FIRMS; a check that fails stays in the table.
 
 | Case | Check | Expected | Measured | |
 |---|---|---|---|---|
@@ -735,33 +737,64 @@ from each source, never from FIRMS; a check that fails stays in the table.
 | tirreno | and says that it cannot prove there was none | presence_only ≥ 1 | 1 | ✅ |
 | season-2021 | among the three worst years of 2012-2025 | rank ≤ 3 | 3 | ✅ |
 | season-2017 | among the three worst years of 2012-2025 | rank ≤ 3 | 1 | ✅ |
+| sindia-2021 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 59%, natural vegetation 41% | ❌ |
+| polizzi-2022 | classified as a fire on cropland | crop_burning or cropland_fire | no detection inside the perimeter | ❌ |
+| pietraperzia-2023 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 71%, natural vegetation 29% | ❌ |
+| aragona-2024 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 62%, natural vegetation 38% | ❌ |
+| irsina-2025 | classified as a fire on cropland | crop_burning or cropland_fire | cropland_fire: cropland 88%, natural vegetation 12%, 21 hotspots over 1 day | ✅ |
+| san-luca-2021 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
+| piazza-armerina-2022 | classified as a wildfire | wildfire | wildfire: natural vegetation 99% | ✅ |
+| palermo-2023 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
+| monte-verna-2024 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
+| san-giovanni-rotondo-2025 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
 
-**11 of 13** checks pass.
+**17 of 23** checks pass.
 
-The Etna lava flow is the trap that is still open ([#15](https://github.com/agent-engineering-studio/firms-client/issues/15)): FIRMS types 44 % of
-its detections as vegetation fires, and the static mask, learnt from the
-years before, still lets 15 % through. With the archive's `type`, Taranto's
-steelworks is dropped; with the type hidden, as in the area API, the mask
-drops it too, and with it the 30 detections FIRMS typed as vegetation inside
-the same box: the mask cannot tell a fire next to a factory from the factory
-(`label(..., spare_frp_mw=)` leaves strong ones alone).
+What the failures say:
+
+- **The Etna lava flow** ([#15](https://github.com/agent-engineering-studio/firms-client/issues/15)):
+  FIRMS types 44 % of its detections as vegetation fires, and the static
+  mask, learnt from the years before, still lets 15 % through.
+- **Fires on cropland** ([#17](https://github.com/agent-engineering-studio/firms-client/issues/17)):
+  where EFFIS says the land was at least 90 % agricultural (CORINE),
+  `classify_burning` gets 1 of 4 right. The other three come out `mixed`:
+  WorldCover sees 59-71 % cropland and 29-37 % grassland (pasture and
+  fallow land, which CORINE counts as agricultural), and the rule allows at
+  most 15 % natural vegetation. Two of the three rest on a single detection
+  inside the perimeter (Sindia, Pietraperzia), Aragona on fifteen. Wildfires on natural land are right 5 of 5. The thresholds are
+  not changed here: tuned on these cases, they would test nothing; they
+  will be fitted on the perimeters of earlier years and tested on these.
+- **A fire FIRMS missed**: Polizzi Generosa, 6 July 2022, 876 ha by EFFIS,
+  and not one VIIRS S-NPP detection inside the perimeter in three days
+  (Sindia, 914 ha, has three). The library cannot classify what it did not
+  see: the answer is «not measured», and it counts as a failure, not as
+  «no fire».
+
+Taranto's steelworks is dropped with the archive's `type`, and with the
+type hidden, as in the area API, the mask drops it too, and with it the 30
+detections FIRMS typed as vegetation inside the same box: the mask cannot
+tell a fire next to a factory from the factory (`label(..., spare_frp_mw=)`
+leaves strong ones alone).
 
 What is not there yet:
 
-- **crop burning**: no case, because no source independent of FIRMS says
-  which detections were stubble fires; `classify_burning` is validated
-  against EFFIS perimeters and municipal fire cadastres in Limen ([#17](https://github.com/agent-engineering-studio/firms-client/issues/17)), and
-  only the result will come back here;
-- **a fire FIRMS missed** (too small, under cloud, between two overpasses):
-  the open sea shows only that the library says it cannot prove absence;
-  how much to trust a place comes with the reliability estimate ([#26](https://github.com/agent-engineering-studio/firms-client/issues/26), phase 2);
+- **why the land burnt**: EFFIS says what land burnt, not whether it was
+  stubble burning or an accident, and it maps only fires of about 30 ha and
+  more; small stubble fires have no open truth we know of (municipal fire
+  cadastres record woods and pastures, not arable land);
+- **how much to trust a place**: the missed fires above are the first data
+  for it; it comes with the reliability estimate
+  ([#26](https://github.com/agent-engineering-studio/firms-client/issues/26), phase 2);
 - **MODIS and the near-real-time area API**: every case is a VIIRS S-NPP
   archive; the area API is checked live in phase 3.
 
-The data are crops of the open country archives, committed in
-`benchmarks/data/` with their source; `benchmarks/cases.toml` cites the source
-of every range. `make bench` scores them offline, as CI does on every change;
-`uv run python -m benchmarks.fetch` downloads and crops them again.
+The data are small crops of open sources, committed in `benchmarks/data/`
+with their source: the FIRMS country archives (the archive's own lines),
+the EFFIS burnt-area perimeters (© European Union, 1995-2025, CC BY 4.0)
+and ESA WorldCover 2021 (CC BY 4.0) only around the detections.
+`benchmarks/cases.toml` cites the source of every range and the rule that
+picked the EFFIS cases. `make bench` scores them offline, as CI does on
+every change; `make bench-data` downloads and crops them again.
 
 ---
 

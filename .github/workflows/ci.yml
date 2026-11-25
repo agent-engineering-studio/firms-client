@@ -55,7 +55,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --extra landcover
       - run: uv run --no-sync python -m benchmarks.run --check
 
   # The card for the Developers Italia catalogue, checked by its official parser.

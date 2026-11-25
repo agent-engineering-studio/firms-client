@@ -8,15 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- A benchmark of known cases (`benchmarks/`): 13 checks on a wildfire
-  (Montiferru 2021, Palermo 2023), a steelworks (Taranto), a lava flow
-  (Etna, February 2025), the open sea and the two worst Italian seasons in
-  the archives (2017, 2021), each with the independent source of its range.
-  Offline on crops of the open archives, scored in CI with `--check`
-  (`make bench`; `make bench-data` downloads and crops them again).
-  11 of 13 pass: the two that fail are the Etna lava flow, typed as
-  vegetation fire by FIRMS (44 %) and still let through by the static mask
-  (15 %), #15.
+- A benchmark of known cases (`benchmarks/`): 23 checks, each with a source
+  independent of FIRMS. Two wildfires (Montiferru 2021, Palermo 2023), a
+  steelworks (Taranto), a lava flow (Etna, February 2025), the open sea, the
+  2017 and 2021 seasons (EFFIS), and ten EFFIS burnt areas, 90 % agricultural
+  or 90 % natural land, picked by a rule written before scoring. Offline on
+  crops of the open sources (FIRMS archives, EFFIS perimeters, WorldCover
+  around the detections), scored in CI with `--check` (`make bench`;
+  `make bench-data` downloads and crops them again). 17 of 23 pass: the Etna
+  lava flow (#15); `classify_burning` gets 1 of 4 fires on cropland right
+  and calls 3 `mixed` (#17), while it gets 5 of 5 wildfires right; and an
+  876 ha fire at Polizzi Generosa with no VIIRS detection at all.
 - `publiccode.yml`, checked in CI by the official Developers Italia parser,
   and `docs/riuso.md` for a public body (in Italian). The figures of the
   site also as PNG, for the catalogue.

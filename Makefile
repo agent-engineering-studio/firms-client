@@ -27,12 +27,13 @@ test-core: ## pytest on the core alone, without the extras, as CI does
 	UV_PROJECT_ENVIRONMENT=.venv-core uv run --locked firms --help > /dev/null
 
 bench: ## Score the known cases offline, as CI does: any change from results.json fails
-	uv run python -m benchmarks.run --check
+	uv run --all-extras python -m benchmarks.run --check
 
-# The open country archives (~30 MB, once, into FIRMS_DATA_DIR): no key needed.
+# The open country archives (~30 MB, once, into FIRMS_DATA_DIR), EFFIS perimeters
+# and WorldCover windows: no key needed.
 bench-data: ## Download and crop the data of the known cases again, then score them
-	uv run python -m benchmarks.fetch
-	uv run python -m benchmarks.run
+	uv run --all-extras python -m benchmarks.fetch
+	uv run --all-extras python -m benchmarks.run
 
 build: ## The wheel and the sdist, in dist/
 	uv build

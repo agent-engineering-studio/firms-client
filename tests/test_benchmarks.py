@@ -3,8 +3,18 @@ from __future__ import annotations
 import math
 from datetime import date
 
+import pytest
+
 from benchmarks.fetch import crop_lines, crop_mask
-from benchmarks.run import DATA, check_against_record, load_cases, markdown, passes, score
+from benchmarks.run import (
+    DATA,
+    check_against_record,
+    inside,
+    load_cases,
+    markdown,
+    passes,
+    score,
+)
 from firms_client import MaskRules, StaticMask
 from firms_client.mask import CellVerdict
 
@@ -27,14 +37,26 @@ def test_not_measured_passes_only_as_none() -> None:
 def test_every_case_names_its_source_and_has_its_data() -> None:
     for case in load_cases():
         assert case["source"].strip(), case["id"]
-        assert case["status"] in {"fire", "static", "false-fire", "blind", "season"}, case["id"]
+        assert case["status"] in {
+            "fire",
+            "static",
+            "false-fire",
+            "blind",
+            "season",
+            "cropland",
+            "wildland",
+        }, case["id"]
         assert case["check"], case["id"]
         if "box" in case:
             assert (DATA / case["id"] / "rows.csv").exists(), case["id"]
             assert (DATA / case["id"] / "mask.json").exists() == bool(case.get("mask"))
+        if "effis_id" in case:
+            assert (DATA / case["id"] / "perimeter.geojson").exists(), case["id"]
+            assert any((DATA / case["id"] / "worldcover").rglob("*.tif")), case["id"]
 
 
 def test_the_record_matches_what_the_library_measures() -> None:
+    pytest.importorskip("rasterio")  # the land-cover cases read WorldCover
     assert check_against_record(score()) == []
 
 
@@ -66,3 +88,15 @@ def test_crop_mask_keeps_one_cell_around_the_box() -> None:
     assert set(cropped.cells) == {(4000, 1700)}
     assert cropped.known == frozenset({(4000, 1700)})
     assert cropped.meta["cropped_to"] == [17.0, 40.0, 17.05, 40.05]
+
+
+def test_inside_a_polygon_with_a_hole_and_a_multipolygon() -> None:
+    square = [[0.0, 0.0], [4.0, 0.0], [4.0, 4.0], [0.0, 4.0], [0.0, 0.0]]
+    hole = [[1.0, 1.0], [3.0, 1.0], [3.0, 3.0], [1.0, 3.0], [1.0, 1.0]]
+    polygon = {"type": "Polygon", "coordinates": [square, hole]}
+    assert inside(0.5, 0.5, polygon)
+    assert not inside(2.0, 2.0, polygon)  # in the hole
+    assert not inside(5.0, 2.0, polygon)
+    far = [[[10.0, 10.0], [11.0, 10.0], [11.0, 11.0], [10.0, 10.0]]]
+    multi = {"type": "MultiPolygon", "coordinates": [[square], far]}
+    assert inside(10.8, 10.2, multi) and inside(2.0, 2.0, multi)
