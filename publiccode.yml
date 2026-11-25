@@ -1,0 +1,90 @@
+# The card of firms-client for the software catalogue of Developers Italia.
+# Check it with: docker run --rm -v "$PWD":/w -w /w italia/publiccode-parser-go -no-network publiccode.yml
+publiccodeYmlVersion: "0"
+name: firms-client
+url: "https://github.com/agent-engineering-studio/firms-client.git"
+landingURL: "https://agentengineering.it/firms-client/"
+releaseDate: "2026-11-04"
+softwareVersion: "0.5.0"
+platforms: [linux, mac, windows]
+categories: [geographic-information-systems, data-analytics, data-collection]
+developmentStatus: beta
+softwareType: library
+intendedAudience:
+  scope: [environment, emergency-services, local-authorities, science-and-technology]
+  countries: [IT]
+description:
+  it:
+    shortDescription: I fuochi attivi visti dai satelliti della NASA (FIRMS), in Python
+    longDescription: >
+      firms-client legge FIRMS, il servizio della NASA che pubblica i fuochi attivi visti dai
+      satelliti con i sensori termici MODIS e VIIRS: per ogni pixel molto più caldo dei vicini,
+      posizione, ora, temperatura, potenza radiativa e confidenza, poche ore dopo il passaggio.
+      È una libreria Python con riga di comando. Scarica gli archivi annuali per paese, aperti e
+      senza chiave (MODIS dal 2000, VIIRS dal 2012), e gli ultimi giorni su un'area qualsiasi con
+      una chiave gratuita della NASA. Distingue un incendio di vegetazione da un'acciaieria, da un
+      vulcano o da una piattaforma in mare, anche dove il servizio non lo dice, con una maschera
+      delle fonti fisse ricavata dagli archivi. Raggruppa i pixel in eventi, dice se una stagione
+      è insolita rispetto agli anni passati, se a bruciare sono campi o bosco, e prepara bozze di
+      bollettino in cui ogni numero viene dai dati. Ha un server MCP perché un assistente AI
+      risponda con i numeri dei dati, citando la fonte. Non usa dati personali. Un fuoco visto
+      dal satellite non è un'allerta: per il pericolo valgono le comunicazioni ufficiali della
+      Protezione Civile.
+    features:
+      - Archivi annuali per paese, aperti e senza chiave
+      - Gli ultimi giorni su qualsiasi area, con una chiave gratuita della NASA
+      - Incendio di vegetazione o fonte fissa (industria, vulcano, mare)
+      - Maschera delle fonti fisse dove il servizio non dà il tipo
+      - Eventi, riassunti e anomalia della stagione
+      - Roghi agricoli o incendi, dalla copertura del suolo ESA WorldCover
+      - Bozze di bollettino con ogni numero verificato sui dati
+      - Riga di comando e server MCP per gli assistenti AI
+    screenshots:
+      - docs/images/map.png
+      - docs/images/types.png
+      - docs/images/monthly.png
+  en:
+    shortDescription: The active fires seen by NASA's satellites (FIRMS), in Python
+    longDescription: >
+      firms-client reads FIRMS, the NASA service that publishes the active fires seen by
+      satellites with the MODIS and VIIRS thermal sensors: for every pixel much hotter than its
+      neighbours, position, time, temperature, radiative power and confidence, a few hours after
+      the overpass. It is a Python library with a command line. It downloads the yearly archives
+      per country, open and with no key (MODIS from 2000, VIIRS from 2012), and the last days over
+      any area with a free NASA key. It tells a vegetation fire from a steelworks, a volcano or an
+      offshore platform, even where the service does not say, with a mask of static sources
+      learnt from the archives. It groups pixels into events, says whether a season is unusual
+      against past years, whether fields or woods are burning, and drafts bulletins in which every
+      number comes from the data. It has an MCP server so that an AI assistant answers with the
+      numbers of the data, citing the source. It uses no personal data. A fire seen from a
+      satellite is not an alert: for danger, the official word is the Civil Protection's.
+    features:
+      - Yearly archives per country, open and with no key
+      - The last days over any area, with a free NASA key
+      - Vegetation fire or static source (industry, volcano, offshore)
+      - A static-source mask where the service gives no type
+      - Events, digests and season anomaly
+      - Crop burning or wildfire, from ESA WorldCover land cover
+      - Draft bulletins with every number checked against the data
+      - Command line and an MCP server for AI assistants
+    screenshots:
+      - docs/images/map.png
+      - docs/images/types.png
+      - docs/images/monthly.png
+organisation:
+  name: Agent Engineering Studio
+  uri: "https://github.com/agent-engineering-studio"
+legal:
+  license: Apache-2.0
+  mainCopyrightOwner: Agent Engineering Studio
+maintenance:
+  type: community
+  contacts:
+    - name: Giuseppe Zileni
+localisation:
+  localisationReady: false
+  availableLanguages: [en]
+IT:
+  countryExtensionVersion: "1.0"
+  riuso:
+    codiceIPA: ""   # empty until the software belongs to a public administration

@@ -57,6 +57,9 @@ dev = [
     "pytest-cov>=6.0",
     "ruff>=0.8",
 ]
+docs = [
+    "pdoc>=16.0.0",
+]
 
 [tool.ruff]
 line-length = 100

@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `publiccode.yml`, checked in CI by the official Developers Italia parser,
+  and `docs/riuso.md` for a public body (in Italian). The figures of the
+  site also as PNG, for the catalogue.
+- The API reference, generated from the docstrings with `pdoc` and published
+  with the site at `/api/` (never committed); linked from the home page, the
+  roadmap and `llms.txt` (#22).
+- `make help`, `test-core`, `docs` and `clean`. `make docs` builds the site
+  exactly as the Pages workflow does.
+- CI: a job on the core alone, without the extras (#23); a job that builds
+  the site.
+- A test that the package imports no other library of Limen, and one that
+  every name in `__all__` appears in `llms.txt`.
+
+### Fixed
+
+- Without the extras, the pure tests of bulletins and land cover were
+  skipped with the tests of `ClaudeWriter` and `WorldCover`: those moved to
+  `test_bulletin_claude.py` and `test_worldcover.py`, and the core now runs
+  88 tests instead of 67.
+- `llms.txt` was missing 24 public names.
+
 ## [0.5.0] - 2026-11-04
 
 ### Added

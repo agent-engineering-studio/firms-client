@@ -5,7 +5,7 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["docs/**", ".github/workflows/pages.yml"]
+    paths: ["docs/**", "src/**", "Makefile", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -25,11 +25,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
-      - name: Collect the site
-        run: |
-          mkdir -p _site
-          cp docs/*.html docs/*.css docs/llms.txt _site/
-          cp -r docs/images _site/images
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Build the site and the API reference
+        run: make docs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
