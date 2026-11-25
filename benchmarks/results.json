@@ -1,0 +1,126 @@
+{
+  "archives": [
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2021/viirs-snpp_2021_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2023/viirs-snpp_2023_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2025/viirs-snpp_2025_Italy.csv"
+  ],
+  "rows": [
+    {
+      "case": "montiferru",
+      "status": "fire",
+      "check": "a wildfire: kept as vegetation fire",
+      "kind": "kept",
+      "measured": 0.994,
+      "expected": "share kept ≥ 0.9",
+      "pass": true
+    },
+    {
+      "case": "montiferru",
+      "status": "fire",
+      "check": "the largest event reaches Cuglieri",
+      "kind": "event",
+      "measured": 1.0,
+      "expected": "contains ≥ 1",
+      "pass": true
+    },
+    {
+      "case": "montiferru",
+      "status": "fire",
+      "check": "about 13,000 ha: at least 10 km across",
+      "kind": "event",
+      "measured": 13.747,
+      "expected": "extent_km ≥ 10.0",
+      "pass": true
+    },
+    {
+      "case": "palermo",
+      "status": "fire",
+      "check": "wildfires: kept as vegetation fires",
+      "kind": "kept",
+      "measured": 0.925,
+      "expected": "share kept ≥ 0.9",
+      "pass": true
+    },
+    {
+      "case": "palermo",
+      "status": "fire",
+      "check": "many separate fires around the city",
+      "kind": "events",
+      "measured": 32.0,
+      "expected": "events ≥ 5",
+      "pass": true
+    },
+    {
+      "case": "taranto",
+      "status": "static",
+      "check": "with the archive's type: almost nothing kept",
+      "kind": "kept",
+      "measured": 0.034,
+      "expected": "share kept ≤ 0.05",
+      "pass": true
+    },
+    {
+      "case": "taranto",
+      "status": "static",
+      "check": "type hidden, as in the area API: the mask drops it",
+      "kind": "kept",
+      "measured": 0.0,
+      "expected": "share kept ≤ 0.05",
+      "pass": true
+    },
+    {
+      "case": "etna",
+      "status": "false-fire",
+      "check": "with the archive's type: no vegetation fire",
+      "kind": "kept",
+      "measured": 0.436,
+      "expected": "share kept ≤ 0.05",
+      "pass": false
+    },
+    {
+      "case": "etna",
+      "status": "false-fire",
+      "check": "type hidden, with the mask: no vegetation fire",
+      "kind": "kept",
+      "measured": 0.149,
+      "expected": "share kept ≤ 0.05",
+      "pass": false
+    },
+    {
+      "case": "tirreno",
+      "status": "blind",
+      "check": "no fire found",
+      "kind": "summary",
+      "measured": 0.0,
+      "expected": "fires ≤ 0",
+      "pass": true
+    },
+    {
+      "case": "tirreno",
+      "status": "blind",
+      "check": "and says that it cannot prove there was none",
+      "kind": "summary",
+      "measured": 1.0,
+      "expected": "presence_only ≥ 1",
+      "pass": true
+    },
+    {
+      "case": "season-2021",
+      "status": "season",
+      "check": "among the three worst years of 2012-2025",
+      "kind": "season",
+      "measured": 3.0,
+      "expected": "rank ≤ 3",
+      "pass": true
+    },
+    {
+      "case": "season-2017",
+      "status": "season",
+      "check": "among the three worst years of 2012-2025",
+      "kind": "season",
+      "measured": 1.0,
+      "expected": "rank ≤ 3",
+      "pass": true
+    }
+  ]
+}

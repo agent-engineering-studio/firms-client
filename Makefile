@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help check lint format typecheck test test-core build docs clean
+.PHONY: help check lint format typecheck test test-core build docs bench bench-data clean
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -25,6 +25,14 @@ test: ## pytest with coverage, every extra installed (no key, no network)
 test-core: ## pytest on the core alone, without the extras, as CI does
 	UV_PROJECT_ENVIRONMENT=.venv-core uv run --locked pytest -p no:cacheprovider
 	UV_PROJECT_ENVIRONMENT=.venv-core uv run --locked firms --help > /dev/null
+
+bench: ## Score the known cases offline, as CI does: any change from results.json fails
+	uv run python -m benchmarks.run --check
+
+# The open country archives (~30 MB, once, into FIRMS_DATA_DIR): no key needed.
+bench-data: ## Download and crop the data of the known cases again, then score them
+	uv run python -m benchmarks.fetch
+	uv run python -m benchmarks.run
 
 build: ## The wheel and the sdist, in dist/
 	uv build

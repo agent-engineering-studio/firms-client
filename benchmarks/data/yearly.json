@@ -1,0 +1,37 @@
+{
+  "product": "viirs-snpp",
+  "country": "Italy",
+  "years": {
+    "2012": 22987,
+    "2013": 11534,
+    "2014": 12871,
+    "2015": 12175,
+    "2016": 13605,
+    "2017": 26617,
+    "2018": 8432,
+    "2019": 13893,
+    "2020": 13674,
+    "2021": 20648,
+    "2022": 12088,
+    "2023": 16449,
+    "2024": 9044,
+    "2025": 14880
+  },
+  "archives": [
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2012/viirs-snpp_2012_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2013/viirs-snpp_2013_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2014/viirs-snpp_2014_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2015/viirs-snpp_2015_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2016/viirs-snpp_2016_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2017/viirs-snpp_2017_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2018/viirs-snpp_2018_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2019/viirs-snpp_2019_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2020/viirs-snpp_2020_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2021/viirs-snpp_2021_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2022/viirs-snpp_2022_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2023/viirs-snpp_2023_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2024/viirs-snpp_2024_Italy.csv",
+    "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2025/viirs-snpp_2025_Italy.csv"
+  ],
+  "counted": "select() with its defaults: vegetation fires, nominal or high"
+}

@@ -1,0 +1,191 @@
+# Known places and seasons where we know what FIRMS should say, and why.
+#
+# Each case has a box in degrees (west, south, east, north), a window of
+# dates and the archive it comes from. fetch.py copies the archive rows
+# inside box and window, unchanged, into benchmarks/data/<id>/rows.csv; with
+# mask = true, also the static mask learnt from the years before, cropped to
+# the box. run.py scores the checks offline.
+#
+# The expected ranges come from the source of each case, not from FIRMS: a
+# range tuned on the data it tests would test nothing. A check that fails is
+# kept and recorded: it is a trap the library still falls into.
+#
+# Status: fire (a wildfire, by an independent source), static (a hot thing
+# that is not a fire), false-fire (hot, typed as vegetation, not a fire),
+# blind (where FIRMS cannot say), season (a year among the others).
+#
+# Check kinds:
+#   kept     the share of the rows select() keeps as vegetation fires; with
+#            hide_type = true, the type is removed (as in the area API) and
+#            the case's static mask labels the rows first.
+#   event    the largest event of cluster(select(rows)): stat = "extent_km"
+#            (the longer side of its box) or "contains" (1 when lon/lat is
+#            inside its box, else 0).
+#   events   how many events cluster(select(rows)) finds.
+#   summary  summarize(rows): stat = "fires", or "presence_only" (1 when the
+#            caveats say that no detection does not mean no fire).
+#   season   anomaly() of a year's vegetation-fire detections against the
+#            other years of yearly.json: stat = "rank" (1 = the most).
+
+[[case]]
+id = "montiferru"
+title = "Montiferru, Sardinia: the largest wildfire of 2021 in Italy"
+status = "fire"
+product = "viirs-snpp"
+year = 2021
+box = [8.40, 40.00, 8.80, 40.30]
+window = ["2021-07-22", "2021-07-30"]
+source = """The fire started on 23 July 2021 at Bonarcado, reached Santu Lussurgiu, \
+Cuglieri and Scano di Montiferro; Cuglieri was evacuated in the night of 24-25 July. \
+About 13,000 ha burnt, 4,000 of them woods (AGI, 22 July 2022, on the closing of the \
+inquiry: https://www.agi.it/cronaca/news/2022-07-22/incendi-sardegna-rogo-montiferru-2021-senza-colpevoli-17526940/)."""
+
+  [[case.check]]
+  kind = "kept"
+  name = "a wildfire: kept as vegetation fire"
+  min = 0.9
+
+  [[case.check]]
+  kind = "event"
+  name = "the largest event reaches Cuglieri"
+  stat = "contains"
+  lon = 8.5683
+  lat = 40.1876
+  min = 1
+
+  [[case.check]]
+  kind = "event"
+  name = "about 13,000 ha: at least 10 km across"
+  stat = "extent_km"
+  min = 10.0
+
+[[case]]
+id = "palermo"
+title = "Palermo, 24-25 July 2023: the city ringed by fires"
+status = "fire"
+product = "viirs-snpp"
+year = 2023
+box = [13.05, 38.00, 13.50, 38.25]
+window = ["2023-07-23", "2023-07-27"]
+source = """On 24-25 July 2023 fires burnt from Mondello to Bellolampo, the landfill of \
+Bellolampo caught fire and Punta Raisi airport closed; fires also at Terrasini, Cinisi \
+and Monreale (Open, 25 July 2023: \
+https://www.open.online/2023/07/25/palermo-incendio-discarica-bellolampo-monte-gallo-inserra). \
+No reliable burnt area: the checks ask only for many separate fires."""
+
+  [[case.check]]
+  kind = "kept"
+  name = "wildfires: kept as vegetation fires"
+  min = 0.9
+
+  [[case.check]]
+  kind = "events"
+  name = "many separate fires around the city"
+  min = 5
+
+[[case]]
+id = "taranto"
+title = "Taranto: the steelworks, hot all year"
+status = "static"
+product = "viirs-snpp"
+year = 2025
+box = [17.15, 40.46, 17.25, 40.54]
+window = ["2025-01-01", "2025-12-31"]
+mask = true
+source = """The former ILVA steelworks (Acciaierie d'Italia) at Taranto, the largest in \
+Europe, runs blast furnaces and coke ovens all year: a static land source, FIRMS type 2 \
+(https://www.earthdata.nasa.gov/data/tools/firms, attribute «type»). Not a fire."""
+
+  [[case.check]]
+  kind = "kept"
+  name = "with the archive's type: almost nothing kept"
+  max = 0.05
+
+  [[case.check]]
+  kind = "kept"
+  name = "type hidden, as in the area API: the mask drops it"
+  hide_type = true
+  max = 0.05
+
+[[case]]
+id = "etna"
+title = "Etna, February 2025: a lava flow on bare rock"
+status = "false-fire"
+product = "viirs-snpp"
+year = 2025
+box = [14.90, 37.68, 15.05, 37.78]
+window = ["2025-02-08", "2025-03-15"]
+mask = true
+source = """INGV Osservatorio Etneo: from 8 February 2025 a lava flow came out at about \
+3,000 m between Bocca Nuova and the South-East Crater and ran south-west for more than \
+4 km (communiqué of 8 February 2025, \
+https://www.ct.ingv.it/Dati/informative/vulcanico/ComunicatoETNA20250208190943.pdf, and \
+the weekly bulletins of 11, 18 and 25 February). Above about 2,000 m Etna is bare lava \
+and, in February, snow: nothing in the box is a vegetation fire. See issue #15."""
+
+  [[case.check]]
+  kind = "kept"
+  name = "with the archive's type: no vegetation fire"
+  max = 0.05
+
+  [[case.check]]
+  kind = "kept"
+  name = "type hidden, with the mask: no vegetation fire"
+  hide_type = true
+  max = 0.05
+
+[[case]]
+id = "tirreno"
+title = "The Tyrrhenian Sea, July 2021: nothing to see"
+status = "blind"
+product = "viirs-snpp"
+year = 2021
+box = [10.50, 39.50, 11.50, 40.50]
+window = ["2021-07-01", "2021-07-31"]
+source = """Open sea between Sardinia and Lazio, far from platforms and islands: there \
+can be no vegetation fire. FIRMS is presence-only: an empty answer must say that no \
+detection does not mean no fire, not that the place is safe."""
+
+  [[case.check]]
+  kind = "summary"
+  name = "no fire found"
+  stat = "fires"
+  max = 0
+
+  [[case.check]]
+  kind = "summary"
+  name = "and says that it cannot prove there was none"
+  stat = "presence_only"
+  min = 1
+
+[[case]]
+id = "season-2021"
+title = "Italy, 2021: the worst fire season in over a decade"
+status = "season"
+product = "viirs-snpp"
+year = 2021
+source = """EFFIS (JRC, Forest Fires in Europe, Middle East and North Africa 2021): \
+159,537 ha mapped in Italy, the most in over a decade, Italy second in the region after \
+Turkey (https://www.regione.toscana.it/-/l-italia-%C3%A8-il-secondo-paese-pi%C3%B9-colpito-da-incendi-forestali-nel-2021-nella-regione-europa-e-mediterraneo%C2%A0)."""
+
+  [[case.check]]
+  kind = "season"
+  name = "among the three worst years of 2012-2025"
+  stat = "rank"
+  max = 3
+
+[[case]]
+id = "season-2017"
+title = "Italy, 2017: the record before 2021"
+status = "season"
+product = "viirs-snpp"
+year = 2017
+source = """EFFIS, cited by ANSA (25 August 2021): about 141,000 ha burnt in Italy in \
+2017, the worst year until 2021 \
+(https://www.ansa.it/english/news/2021/08/25/wildfires-have-claimed-area-equal-to-rome-naples-milan_e1f38b05-1da9-46d4-a280-0725d8ac78cd.html)."""
+
+  [[case.check]]
+  kind = "season"
+  name = "among the three worst years of 2012-2025"
+  stat = "rank"
+  max = 3

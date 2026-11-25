@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A benchmark of known cases (`benchmarks/`): 13 checks on a wildfire
+  (Montiferru 2021, Palermo 2023), a steelworks (Taranto), a lava flow
+  (Etna, February 2025), the open sea and the two worst Italian seasons in
+  the archives (2017, 2021), each with the independent source of its range.
+  Offline on crops of the open archives, scored in CI with `--check`
+  (`make bench`; `make bench-data` downloads and crops them again).
+  11 of 13 pass: the two that fail are the Etna lava flow, typed as
+  vegetation fire by FIRMS (44 %) and still let through by the static mask
+  (15 %), #15.
 - `publiccode.yml`, checked in CI by the official Developers Italia parser,
   and `docs/riuso.md` for a public body (in Italian). The figures of the
   site also as PNG, for the catalogue.
