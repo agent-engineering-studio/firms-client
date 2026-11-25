@@ -22,6 +22,22 @@ All notable changes to this project are documented here. The format follows
   under the fire-days separates the agricultural fires (0.58-0.86) from the
   wildfires (0-0.004), where `classify_burning` called three of four
   agricultural fires `mixed`. 34 of 41 checks pass in all.
+- `init(directory=None, *, country, years, bbox=None, products=, client=None,
+  retry=None)` -> `InitReport`, and `firms init COUNTRY [--years] [--bbox]`:
+  download once what working offline needs, the yearly archives and the
+  whole WorldCover tiles over a box (Italy: 23 tiles, 1.3 GB), with no
+  rasterio. Idempotent and resumable: files there are skipped, downloads go
+  to `.part`, a failed file is recorded and the rest goes on. It takes the
+  caller's client and retries nothing unless asked. `worldcover_tiles`,
+  `download_worldcover_tile`.
+
+### Changed
+
+- The data directory is `$DATA_ROOT/firms-client`: `DATA_ROOT` is the data
+  root shared by the agent-engineering-studio libraries, read from the
+  environment or `.env` (`ENV_DATA_ROOT`). `FIRMS_DATA_DIR` still overrides
+  it, for compatibility, but is no longer in `.env.example`; with neither,
+  `~/.cache/firms-client` as before.
 
 ## [0.6.0] - 2026-11-25
 

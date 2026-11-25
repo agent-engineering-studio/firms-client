@@ -50,7 +50,7 @@
     <p class="sub">Built for researchers, data engineers and civil-protection teams who want FIRMS data in a notebook or a pipeline, without the e-mail order form.</p>
     <div class="grid">
       <div class="card"><h3><span class="icon">📦</span>Open yearly archives</h3><p>MODIS from 2000 and VIIRS S-NPP from 2012, per country, with no Earthdata login and no key.</p></div>
-      <div class="card"><h3><span class="icon">💾</span>Never download twice</h3><p>Archives are saved in a persistent data directory (<code>FIRMS_DATA_DIR</code>) and read from disk next time.</p></div>
+      <div class="card"><h3><span class="icon">💾</span>Never download twice</h3><p>Archives are saved in a persistent data directory (<code>$DATA_ROOT/firms-client</code>) and read from disk next time.</p></div>
       <div class="card"><h3><span class="icon">⚡</span>Near-real-time API</h3><p>The last 1-5 days over any bounding box, about 3 hours after the overpass, with a free MAP_KEY.</p></div>
       <div class="card"><h3><span class="icon">🔥</span>Fire or factory?</h3><p>Every detection carries its FIRMS <code>type</code>: vegetation, volcano, industry, offshore.</p></div>
       <div class="card"><h3><span class="icon">🎚️</span>One confidence scale</h3><p>MODIS percentages and VIIRS <code>l</code>/<code>n</code>/<code>h</code> judged by one rule.</p></div>
@@ -184,7 +184,7 @@ fires = select(mask.label(rows), min_frp_mw=1.0)</code></pre>
           <tr><td><code>confidence_level(raw)</code></td><td>pure</td><td>MODIS % or VIIRS level → <code>"low"</code> / <code>"nominal"</code> / <code>"high"</code></td></tr>
           <tr><td><code>is_hotspot_csv(text)</code></td><td>pure</td><td>is this a hotspot CSV, or an error page?</td></tr>
           <tr><td><code>archive_url</code>, <code>archive_filename</code>, <code>area_url</code>, <code>archive_years</code></td><td>pure</td><td>URLs, file names, year ranges</td></tr>
-          <tr><td><code>default_directory()</code></td><td>pure</td><td><code>FIRMS_DATA_DIR</code>, else <code>~/.cache/firms-client</code></td></tr>
+          <tr><td><code>default_directory()</code></td><td>pure</td><td><code>$DATA_ROOT/firms-client</code>, else <code>~/.cache/firms-client</code></td></tr>
           <tr><td><code>fetch_area_range(client, map_key, source, bbox, start, end)</code></td><td>async</td><td>any date range, in 5-day requests</td></tr>
           <tr><td><code>cluster(hotspots, *, radius_m, gap_days)</code></td><td>pure</td><td>hotspots → <code>FireEvent</code>s, largest first</td></tr>
           <tr><td><code>summarize(hotspots)</code></td><td>pure</td><td>a JSON digest of a few KB, for people and LLMs</td></tr>

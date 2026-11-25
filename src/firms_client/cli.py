@@ -5,14 +5,17 @@
     firms area --bbox 6,36,19,47.6 --source VIIRS_SNPP_SP --from 2025-07-01 --to 2025-07-31
     firms area --bbox 14.9,37.6,15.3,37.9 --days 2 --mask Italy --fires
     firms anomaly Italy 2025 --month 7
+    firms init Italy --bbox 6,35,19,48                    # once: archives + WorldCover tiles
     firms sync Italy --worldcover 16.4,40.5,16.8,40.8     # once, before a server starts
+    firms cells Italy 2024 --mask > cells.csv             # fire-days per 1 km cell
     firms trust 40.51 17.20 --country Italy               # a detection here: a fire?
     firms status Italy                                    # what FIRMS has, lacks, and the key
 
 Results go to stdout (``--format summary``, ``json`` for the
 :func:`~firms_client.summarize` digest, ``csv`` or ``geojson``),
 messages to stderr. The MAP_KEY comes from ``--key``, else ``FIRMS_MAP_KEY`` in the
-environment or in the ``.env`` of the current directory; so does ``FIRMS_DATA_DIR``.
+environment or in the ``.env`` of the current directory; so is the data directory
+(``DATA_ROOT``, see :func:`~firms_client.default_directory`).
 Requests are retried on 429, 5xx and dropped connections.
 """
 
@@ -45,6 +48,7 @@ from firms_client.client import (
 from firms_client.errors import FirmsError
 from firms_client.export import to_csv, to_geojson
 from firms_client.hotspots import Hotspot, select, within
+from firms_client.init import init
 from firms_client.mask import fetch_static_mask
 from firms_client.reliability import Reliability, seen, trust
 from firms_client.retry import RetryPolicy
@@ -68,6 +72,7 @@ from firms_client.sync import sync
 
 _TYPES = {0: "vegetation fire", 1: "active volcano", 2: "static land source", 3: "offshore"}
 _PRODUCTS = {p.slug: p for p in ARCHIVE_PRODUCTS}
+_DIR_HELP = "data directory (default: $DATA_ROOT/firms-client)"
 
 
 class UsageError(Exception):
@@ -80,6 +85,14 @@ def _bbox(text: str) -> BBox:
     except ValueError:
         raise argparse.ArgumentTypeError("expected west,south,east,north") from None
     return west, south, east, north
+
+
+def _years(text: str) -> range:
+    first, _, last = text.partition("-")
+    try:
+        return range(int(first), int(last or first) + 1)
+    except ValueError:
+        raise argparse.ArgumentTypeError("years as FIRST-LAST, e.g. 2012-2025") from None
 
 
 def _date(text: str) -> date:
@@ -109,7 +122,7 @@ def _parser() -> argparse.ArgumentParser:
     archive.add_argument("country", help="English name as FIRMS writes it: Italy, United_States")
     archive.add_argument("year", type=int)
     archive.add_argument("--product", choices=sorted(_PRODUCTS), default="viirs-snpp")
-    archive.add_argument("--dir", type=Path, help="data directory (default: FIRMS_DATA_DIR)")
+    archive.add_argument("--dir", type=Path, help=_DIR_HELP)
 
     area = commands.add_parser(
         "area", parents=[common], help="detections over a bounding box, with a MAP_KEY"
@@ -153,7 +166,19 @@ def _parser() -> argparse.ArgumentParser:
     sync_.add_argument(
         "--worldcover", type=_bbox, metavar="W,S,E,N", help="copy WorldCover over this box"
     )
-    sync_.add_argument("--dir", type=Path, help="data directory (default: FIRMS_DATA_DIR)")
+    sync_.add_argument("--dir", type=Path, help=_DIR_HELP)
+
+    init_ = commands.add_parser(
+        "init", help="download archives and whole WorldCover tiles once, for offline use"
+    )
+    init_.add_argument("country")
+    init_.add_argument(
+        "--years", type=_years, metavar="FIRST-LAST", help="default: from 2012 to last year"
+    )
+    init_.add_argument("--bbox", type=_bbox, metavar="W,S,E,N", help="WorldCover tiles over it")
+    init_.add_argument("--product", choices=(*sorted(_PRODUCTS), "all"), default="viirs-snpp")
+    init_.add_argument("--dir", type=Path, help="data directory (default: see default_directory)")
+    init_.add_argument("--format", choices=("summary", "json"), default="summary", dest="fmt")
 
     trust_ = commands.add_parser(
         "trust", help="how far a detection at a place can be read as a vegetation fire"
@@ -180,7 +205,7 @@ def _parser() -> argparse.ArgumentParser:
     cells.add_argument(
         "--land", action="store_true", help="land under the fires (WorldCover, landcover extra)"
     )
-    cells.add_argument("--dir", type=Path, help="data directory (default: FIRMS_DATA_DIR)")
+    cells.add_argument("--dir", type=Path, help=_DIR_HELP)
     cells.add_argument("--format", choices=("csv", "json"), default="csv", dest="fmt")
 
     status = commands.add_parser(
@@ -282,6 +307,37 @@ async def _trust(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
     if rate is not None:
         lines.append(rate.describe())
     return "\n".join(lines) + "\n"
+
+
+class InitFailedError(Exception):
+    """Some files failed: the report is printed, and the exit code is 1."""
+
+
+async def _init(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
+    products = ARCHIVE_PRODUCTS if args.product == "all" else (_PRODUCTS[args.product],)
+    years = args.years or range(min(p.first_year for p in products), date.today().year)
+    report = await init(
+        args.dir,
+        country=args.country,
+        years=years,
+        bbox=args.bbox,
+        products=products,
+        client=client,
+        retry=RetryPolicy(),
+    )
+    if args.fmt == "json":
+        text = json.dumps(report.as_dict(), indent=2) + "\n"
+    else:
+        lines = [
+            f"{report.directory}: {len(report.downloaded)} downloaded, "
+            f"{len(report.skipped)} already there, {len(report.missing)} not published "
+            f"(years) or open sea (tiles), {len(report.failed)} failed",
+            *(f"  failed {name}: {error}" for name, error in report.failed.items()),
+        ]
+        text = "\n".join(lines) + "\n"
+    if not report.ok:
+        raise InitFailedError(text)
+    return text
 
 
 _CELL_COLUMNS = (
@@ -435,6 +491,8 @@ def main(
                 return await _sync(args, client)
             if args.command == "trust":
                 return await _trust(args, client)
+            if args.command == "init":
+                return await _init(args, client)
             if args.command == "cells":
                 return await _cells(args, client)
             if args.command == "status":
@@ -443,6 +501,9 @@ def main(
 
     try:
         text = asyncio.run(run())
+    except InitFailedError as failed:
+        sys.stdout.write(str(failed))
+        return 1
     except (UsageError, FirmsError, ValueError, httpx.HTTPError) as error:
         print(f"firms: {error}", file=sys.stderr)
         return 1

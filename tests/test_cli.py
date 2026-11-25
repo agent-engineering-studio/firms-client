@@ -298,3 +298,18 @@ def test_cells_as_json_in_a_region(capsys: pytest.CaptureFixture[str]) -> None:
 def test_cells_of_an_unpublished_year_is_an_error(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["cells", "Italy", "2011"], transport=TRANSPORT) == 1
     assert "no viirs-snpp archive" in capsys.readouterr().err
+
+
+def test_init_downloads_once_and_says_what_it_did(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["init", "Italy", "--years", "2024-2025"], transport=TRANSPORT) == 0
+    assert "1 downloaded, 0 already there, 1 not published" in capsys.readouterr().out
+    assert main(["init", "Italy", "--years", "2025", "--format", "json"], transport=TRANSPORT) == 0
+    assert json.loads(capsys.readouterr().out)["skipped"] == ["viirs-snpp_2025_Italy.csv"]
+
+
+def test_init_fails_when_a_file_fails(capsys: pytest.CaptureFixture[str]) -> None:
+    broken = httpx.MockTransport(lambda request: httpx.Response(403))
+    assert main(["init", "Italy", "--years", "2024"], transport=broken) == 1
+    assert "failed viirs-snpp_2024_Italy.csv" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        main(["init", "Italy", "--years", "twenty"], transport=broken)

@@ -168,6 +168,18 @@ def test_the_data_directory_and_the_key_come_from_dotenv(
     assert default_directory() == tmp_path / "env-wins"
 
 
+def test_the_shared_data_root_gives_this_library_its_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FIRMS_DATA_DIR", raising=False)
+    (tmp_path / ".env").write_text("DATA_ROOT=/srv/data\n")
+    assert default_directory() == Path("/srv/data/firms-client")
+    monkeypatch.setenv("DATA_ROOT", str(tmp_path / "root"))
+    assert default_directory() == tmp_path / "root" / "firms-client"
+    monkeypatch.setenv("FIRMS_DATA_DIR", str(tmp_path / "own"))  # the old override still wins
+    assert default_directory() == tmp_path / "own"
+
+
 def test_a_busy_service_is_tried_again(monkeypatch: pytest.MonkeyPatch) -> None:
     from firms_client import RetryPolicy
     from firms_client import retry as retry_module

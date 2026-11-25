@@ -258,15 +258,18 @@ Everything the library downloads goes to **one data directory**, and is
 read from there: the yearly archives, the static mask, the WorldCover copy,
 `sync.json`. Pass `directory=` to a function to choose another; otherwise:
 
-1. `FIRMS_DATA_DIR` from the environment;
-2. else `FIRMS_DATA_DIR` from a `.env` file in the current directory;
-3. else `~/.cache/firms-client` (or `$XDG_CACHE_HOME/firms-client`).
+1. `$DATA_ROOT/firms-client`: `DATA_ROOT` is the data root the
+   agent-engineering-studio libraries share, each in its own folder
+   (`/data/firms-client`, `/data/egms-client`, …);
+2. else `~/.cache/firms-client` (or `$XDG_CACHE_HOME/firms-client`).
 
-The MAP_KEY works the same way (`FIRMS_MAP_KEY`, environment or `.env`).
-`.env.example` lists every setting:
+`DATA_ROOT` is read from the environment, else from a `.env` file in the
+current directory. `FIRMS_DATA_DIR`, if set, still overrides it, for
+compatibility. The MAP_KEY works the same way (`FIRMS_MAP_KEY`, environment
+or `.env`). `.env.example` lists every setting:
 
 ```bash
-cp .env.example .env   # then set FIRMS_DATA_DIR and FIRMS_MAP_KEY
+cp .env.example .env   # then set DATA_ROOT and FIRMS_MAP_KEY
 ```
 
 ```
@@ -297,16 +300,40 @@ In **Docker**, point it at a volume so the data survives the container:
 services:
   app:
     environment:
-      FIRMS_DATA_DIR: /data/firms
+      DATA_ROOT: /data
     volumes:
-      - firms-data:/data/firms
-volumes:
-  firms-data:
+      - ${DATA_ROOT:-./data}:/data
 ```
 
-It is the same convention as
-[egms-client](https://github.com/agent-engineering-studio/egms-client)
-(`EGMS_DATA_DIR`), so one volume can hold both under `/data`.
+The other agent-engineering-studio libraries read the same `DATA_ROOT`, so
+one volume holds all of them, each in its own folder.
+
+### Download it all once: `firms init`
+
+For a server or an installer: the yearly archives and the **whole**
+WorldCover tiles over a box, in one idempotent, resumable step, with no
+`rasterio` needed:
+
+```bash
+firms init Italy --bbox 6,35,19,48               # VIIRS 2012-last year + 23 tiles, 1.3 GB
+firms init Italy --years 2016-2025 --product all # MODIS too, no tiles
+```
+
+A file already there is skipped; a download goes to `.part` and is renamed
+when complete; a failed file is reported (exit code 1) and the rest goes
+on, so running it again resumes. In Python, with your own client and your
+own retry (the library retries nothing unless given `retry=RetryPolicy()`):
+
+```python
+report = await init(country="Italy", years=range(2012, 2026), bbox=(6, 35, 19, 48), client=client)
+report.downloaded, report.skipped, report.missing, report.failed, report.ok
+```
+
+`missing` lists the years not published and the tiles of open sea (they do
+not exist); they are not errors. `download_archive` and
+`download_worldcover_tile` do one file each, for an application that
+retries file by file. The static mask is built later from the archives,
+offline.
 
 ### Fill it before you need it: `firms sync`
 
@@ -1024,7 +1051,8 @@ All checked against the live service on 3 November 2026.
 | `confidence_level(raw)` | pure | MODIS % or VIIRS level → `"low"` / `"nominal"` / `"high"` |
 | `is_hotspot_csv(text)` | pure | is this a hotspot CSV, or an error page? |
 | `archive_url`, `archive_filename`, `area_url`, `area_windows`, `archive_years` | pure | URLs, file names, 5-day windows, year ranges |
-| `default_directory()` | pure | `FIRMS_DATA_DIR`, else `~/.cache/firms-client` |
+| `default_directory()` | pure | `$DATA_ROOT/firms-client` (`FIRMS_DATA_DIR` overrides it), else `~/.cache/firms-client` |
+| `init(directory=None, *, country, years, bbox, products, client, retry)` → `InitReport` | async | archives and whole WorldCover tiles, once, resumable; `download_worldcover_tile`, `worldcover_tiles` |
 | `MODIS`, `VIIRS_SNPP`, `ARCHIVE_PRODUCTS`, `NRT_SOURCES`, `SP_SOURCES`, `MAX_AREA_DAYS` | constants | products and sources |
 | `VEGETATION_FIRE`, `ACTIVE_VOLCANO`, `STATIC_LAND_SOURCE`, `OFFSHORE` | constants | the `type` values |
 | `Hotspot`, `FireEvent`, `ArchiveProduct`, `BBox`, `ConfidenceLevel` | types | |
