@@ -34,8 +34,13 @@ from firms_client.sources import (
 if TYPE_CHECKING:
     import httpx
 
-#: The environment variable :func:`default_directory` reads.
+#: The data root the agent-engineering-studio libraries share; this one uses
+#: ``$DATA_ROOT/firms-client``.
+ENV_DATA_ROOT = "DATA_ROOT"
+#: An override of the data directory for this library alone, kept for compatibility.
 ENV_DATA_DIR = "FIRMS_DATA_DIR"
+#: The folder of ``DATA_ROOT`` this library owns.
+DATA_ROOT_FOLDER = "firms-client"
 #: The environment variable the MAP_KEY is read from (:func:`map_key_from_env`).
 ENV_MAP_KEY = "FIRMS_MAP_KEY"
 
@@ -45,22 +50,36 @@ _CHUNK = 1 << 16
 def default_directory() -> Path:
     """The data directory: every download goes there, and is read from there.
 
-    ``FIRMS_DATA_DIR`` from the environment; else from a ``.env`` file in the
-    current directory (``FIRMS_DATA_DIR=/data/firms``), so a project that
-    keeps its settings there needs nothing else; else ``firms-client`` in the
-    user cache (``$XDG_CACHE_HOME``, or ``~/.cache``). Archives, the static
-    mask, the WorldCover copy and ``sync.json`` all live in it.
+    In order (an explicit ``directory=`` argument always wins over all of
+    them), each read from the environment, else from the ``.env`` file of
+    the current directory:
+
+    * ``FIRMS_DATA_DIR``: this library's own directory (kept for
+      compatibility);
+    * ``DATA_ROOT``: the data root shared by the agent-engineering-studio
+      libraries; this one uses ``$DATA_ROOT/firms-client``;
+    * else ``firms-client`` in the user cache (``$XDG_CACHE_HOME``, or
+      ``~/.cache``).
+
+    Archives, the static mask, WorldCover and ``sync.json`` all live in it.
     """
-    configured = os.environ.get(ENV_DATA_DIR, "").strip() or env_file_value(ENV_DATA_DIR)
+    configured = _setting(ENV_DATA_DIR)
     if configured:
         return Path(configured).expanduser()
+    root = _setting(ENV_DATA_ROOT)
+    if root:
+        return Path(root).expanduser() / DATA_ROOT_FOLDER
     cache = os.environ.get("XDG_CACHE_HOME", "").strip() or "~/.cache"
-    return Path(cache).expanduser() / "firms-client"
+    return Path(cache).expanduser() / DATA_ROOT_FOLDER
+
+
+def _setting(name: str) -> str | None:
+    return os.environ.get(name, "").strip() or env_file_value(name)
 
 
 def map_key_from_env() -> str | None:
     """``FIRMS_MAP_KEY`` from the environment, else from the current directory's ``.env``."""
-    return os.environ.get(ENV_MAP_KEY, "").strip() or env_file_value(ENV_MAP_KEY)
+    return _setting(ENV_MAP_KEY)
 
 
 def env_file_value(name: str, path: Path | None = None) -> str | None:

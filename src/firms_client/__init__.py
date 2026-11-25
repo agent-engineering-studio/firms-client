@@ -24,6 +24,7 @@ from firms_client.cells import (
 )
 from firms_client.client import (
     ENV_DATA_DIR,
+    ENV_DATA_ROOT,
     ENV_MAP_KEY,
     default_directory,
     download_archive,
@@ -49,6 +50,12 @@ from firms_client.hotspots import (
     parse_csv,
     select,
     within,
+)
+from firms_client.init import (
+    InitReport,
+    download_worldcover_tile,
+    init,
+    worldcover_tiles,
 )
 from firms_client.landcover import (
     WORLDCOVER_CLASSES,
@@ -104,6 +111,7 @@ __all__ = [
     "ATTRIBUTION",
     "CSV_COLUMNS",
     "ENV_DATA_DIR",
+    "ENV_DATA_ROOT",
     "ENV_MAP_KEY",
     "MAX_AREA_DAYS",
     "MODIS",
@@ -132,6 +140,7 @@ __all__ = [
     "FirmsError",
     "Grid",
     "Hotspot",
+    "InitReport",
     "LaeaGrid",
     "MaskRules",
     "MissingDays",
@@ -161,6 +170,7 @@ __all__ = [
     "default_directory",
     "distance_m",
     "download_archive",
+    "download_worldcover_tile",
     "draft_bulletin",
     "env_file_value",
     "event_land_cover",
@@ -169,6 +179,7 @@ __all__ = [
     "fetch_area",
     "fetch_area_range",
     "fetch_static_mask",
+    "init",
     "is_hotspot_csv",
     "is_map_key",
     "laea",
@@ -190,4 +201,5 @@ __all__ = [
     "to_geojson",
     "trust",
     "within",
+    "worldcover_tiles",
 ]

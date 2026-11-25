@@ -29,7 +29,7 @@ test-core: ## pytest on the core alone, without the extras, as CI does
 bench: ## Score the known cases offline, as CI does: any change from results.json fails
 	uv run --all-extras python -m benchmarks.run --check
 
-# The open country archives (~30 MB, once, into FIRMS_DATA_DIR), EFFIS perimeters
+# The open country archives (~30 MB, once, into $DATA_ROOT/firms-client), EFFIS perimeters
 # and WorldCover windows: no key needed.
 bench-data: ## Download and crop the data of the known cases again, then score them
 	uv run --all-extras python -m benchmarks.fetch
