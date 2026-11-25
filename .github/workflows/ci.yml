@@ -28,3 +28,41 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest --cov --cov-report=term-missing
       - run: uv build
+
+  # What most users install: the core, no extras. The tests of the extras
+  # skip; everything else must pass, and the command line must start.
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --no-sync pytest
+      - run: uv run --no-sync firms --help
+
+  # The card for the Developers Italia catalogue, checked by its official parser.
+  publiccode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: italia/publiccode-parser-action@v1
+        with:
+          publiccode: publiccode.yml
+          no-network: true
+
+  # The site as Pages publishes it, API reference included: a broken
+  # docstring fails here and not after the merge.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: make docs

@@ -37,6 +37,17 @@ Key facts an assistant must get right:
 - `firms anomaly COUNTRY YEAR [--month M] [--bbox …]`
 - `pip install 'firms-client[mcp]'`, then `firms-mcp` (stdio). Tools: `fire_history`, `archive_digest`, `area_digest` (with `mask_country`), `season_anomaly`, `export_geojson`. Resources: `firms://guide`, `firms://attribution`. Claude Code: `claude mcp add firms -e FIRMS_MAP_KEY=… -- firms-mcp`.
 
+## The rest of the public API
+
+- Archives: `download_archive(client, product, year, country, directory=None, *, retry=None)` -> `Path | None` (the cached yearly CSV), `fetch_archive_csv(...)` -> `str | None` (its text). `ARCHIVE_PRODUCTS` lists the `ArchiveProduct(slug, first_year)` values (`MODIS` 2000, `VIIRS_SNPP` 2012). `ENV_DATA_DIR` is `"FIRMS_DATA_DIR"`.
+- Area API: `MAX_AREA_DAYS` is 5; `area_windows(start, end)` -> `[(on_date, days), …]` covering both ends. `BBox` is `tuple[west, south, east, north]`.
+- Types and columns: `TYPE_NAMES` maps `detection_type` 0-3 to names; `ConfidenceLevel` is `Literal["low", "nominal", "high"]`; `CSV_COLUMNS` is the column order of `to_csv`.
+- Events: `distance_m(a, b)` is the great-circle distance between two hotspots, in metres.
+- Static mask: `build_static_mask(hotspots, rules=None, *, meta=None)` -> `StaticMask` learns static cells from all archive rows (not `select()`-ed ones). `MaskRules` holds the thresholds (`cell_deg=0.01`, `min_detections=3`, `min_static_share=0.5`, `persistent_fire_days=30`, `persistent_years=6`, `persistent_months=8`); `CellVerdict` is why a cell is static (`detection_type`, `reason`, `detections`, `fire_days`, `years`, `months`, `static_share`).
+- Land cover: `event_land_cover(event, land, *, sample=10, radius_m=190.0)` -> `(class shares, positions sampled)`; `BurningRules` holds the thresholds of `classify_burning`; `BurningVerdict` (`kind`, `reason`, `shares`, `sampled`); `WORLDCOVER_CLASSES` maps WorldCover codes to names.
+- Bulletins: `check_grounding(draft, facts)` -> `list[str]` (numbers, places or fields of the draft not in the facts); `nearest_places(latitude, longitude, places, *, k=3)`; `BulletinError` is a writer's refusal or empty answer.
+- `firms_client.__version__` is the installed version.
+
 ## Example
 
 ```python
@@ -55,6 +66,8 @@ asyncio.run(main())
 
 - [README](https://github.com/agent-engineering-studio/firms-client#readme): full guide, recipes, traps
 - [Site](https://agentengineering.it/firms-client/): overview
+- [API reference](https://agentengineering.it/firms-client/api/firms_client.html): every public name, generated from the docstrings
 - [Roadmap](https://agentengineering.it/firms-client/roadmap.html): planned features, including AI
+- [Riuso](https://github.com/agent-engineering-studio/firms-client/blob/main/docs/riuso.md): for a public body (in Italian)
 - [Changelog](https://github.com/agent-engineering-studio/firms-client/blob/main/CHANGELOG.md)
 - [PyPI](https://pypi.org/project/firms-client/)

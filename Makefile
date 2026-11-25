@@ -1,20 +1,43 @@
-.PHONY: check lint format typecheck test build
+.DEFAULT_GOAL := help
+.PHONY: help check lint format typecheck test test-core build docs clean
 
-check: lint typecheck test
+help: ## List the targets
+	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-lint:
+check: lint typecheck test ## The gate of CI: lint, typecheck, test
+
+lint: ## ruff check and format check
 	uv run ruff check
 	uv run ruff format --check
 
-format:
+format: ## Format the code and fix what ruff can
 	uv run ruff format
 	uv run ruff check --fix
 
-typecheck:
-	uv run mypy
+typecheck: ## mypy --strict
+	uv run --all-extras mypy
 
-test:
-	uv run pytest --cov --cov-report=term-missing
+test: ## pytest with coverage, every extra installed (no key, no network)
+	uv run --all-extras pytest --cov --cov-report=term-missing
 
-build:
+# What most users install. Its own environment, so .venv keeps the extras:
+# the tests of the extras skip, the rest must pass.
+test-core: ## pytest on the core alone, without the extras, as CI does
+	UV_PROJECT_ENVIRONMENT=.venv-core uv run --locked pytest -p no:cacheprovider
+	UV_PROJECT_ENVIRONMENT=.venv-core uv run --locked firms --help > /dev/null
+
+build: ## The wheel and the sdist, in dist/
 	uv build
+
+# The same site the Pages workflow publishes: the hand-written pages and the
+# API reference generated from the docstrings (never committed).
+docs: ## The site with the API reference, in _site/
+	rm -rf _site
+	mkdir -p _site
+	cp docs/*.html docs/*.css docs/llms.txt _site/
+	cp -r docs/images _site/images
+	uv run --all-extras --group docs pdoc firms_client -o _site/api
+
+clean: ## Remove what the targets build (downloaded archives stay in the data directory)
+	rm -rf dist _site .venv-core htmlcov .coverage .pytest_cache .mypy_cache .ruff_cache
+	find . -name __pycache__ -type d -prune -exec rm -rf {} +
