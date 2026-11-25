@@ -1,0 +1,10 @@
+{
+  "archive": "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2025/viirs-snpp_2025_Italy.csv",
+  "sha256": "5654e70608ee0fb5e08f919a61751c0d508cc1bf484554d8d0340771735fba4f",
+  "rows": 94,
+  "fetched": "2026-11-25",
+  "mask_years": [
+    2012,
+    2024
+  ]
+}

@@ -37,6 +37,7 @@ One dependency: `httpx`. Website: **[agentengineering.it/firms-client](https://a
 - [Not every hotspot is a fire](#not-every-hotspot-is-a-fire)
 - [How it works](#how-it-works)
 - [Recipes](#recipes)
+- [Known cases](#known-cases-what-the-library-gets-right-and-what-it-does-not)
 - [The traps we already fell into](#the-traps-we-already-fell-into)
 - [API at a glance](#api-at-a-glance)
 - [Contributing](#contributing) · [Ideas to work on](#ideas-to-work-on)
@@ -708,6 +709,59 @@ from firms_client import VIIRS_SNPP, archive_url, parse_csv
 url = archive_url(VIIRS_SNPP, 2025, "Greece")
 rows = parse_csv(requests.get(url, timeout=120).text)
 ```
+
+---
+
+## Known cases: what the library gets right, and what it does not
+
+Thirteen checks on places and seasons where an independent source says what
+happened: a wildfire (Montiferru 2021, Palermo 2023), a steelworks (Taranto),
+a lava flow (Etna, February 2025), the open sea, and the two worst Italian
+seasons in the archives (2017 and 2021, by EFFIS). The expected ranges come
+from each source, never from FIRMS; a check that fails stays in the table.
+
+| Case | Check | Expected | Measured | |
+|---|---|---|---|---|
+| montiferru | a wildfire: kept as vegetation fire | share kept ≥ 0.9 | 0.994 | ✅ |
+| montiferru | the largest event reaches Cuglieri | contains ≥ 1 | 1 | ✅ |
+| montiferru | about 13,000 ha: at least 10 km across | extent_km ≥ 10.0 | 13.747 | ✅ |
+| palermo | wildfires: kept as vegetation fires | share kept ≥ 0.9 | 0.925 | ✅ |
+| palermo | many separate fires around the city | events ≥ 5 | 32 | ✅ |
+| taranto | with the archive's type: almost nothing kept | share kept ≤ 0.05 | 0.034 | ✅ |
+| taranto | type hidden, as in the area API: the mask drops it | share kept ≤ 0.05 | 0 | ✅ |
+| etna | with the archive's type: no vegetation fire | share kept ≤ 0.05 | 0.436 | ❌ |
+| etna | type hidden, with the mask: no vegetation fire | share kept ≤ 0.05 | 0.149 | ❌ |
+| tirreno | no fire found | fires ≤ 0 | 0 | ✅ |
+| tirreno | and says that it cannot prove there was none | presence_only ≥ 1 | 1 | ✅ |
+| season-2021 | among the three worst years of 2012-2025 | rank ≤ 3 | 3 | ✅ |
+| season-2017 | among the three worst years of 2012-2025 | rank ≤ 3 | 1 | ✅ |
+
+**11 of 13** checks pass.
+
+The Etna lava flow is the trap that is still open ([#15](https://github.com/agent-engineering-studio/firms-client/issues/15)): FIRMS types 44 % of
+its detections as vegetation fires, and the static mask, learnt from the
+years before, still lets 15 % through. With the archive's `type`, Taranto's
+steelworks is dropped; with the type hidden, as in the area API, the mask
+drops it too, and with it the 30 detections FIRMS typed as vegetation inside
+the same box: the mask cannot tell a fire next to a factory from the factory
+(`label(..., spare_frp_mw=)` leaves strong ones alone).
+
+What is not there yet:
+
+- **crop burning**: no case, because no source independent of FIRMS says
+  which detections were stubble fires; `classify_burning` is validated
+  against EFFIS perimeters and municipal fire cadastres in Limen ([#17](https://github.com/agent-engineering-studio/firms-client/issues/17)), and
+  only the result will come back here;
+- **a fire FIRMS missed** (too small, under cloud, between two overpasses):
+  the open sea shows only that the library says it cannot prove absence;
+  how much to trust a place comes with the reliability estimate ([#26](https://github.com/agent-engineering-studio/firms-client/issues/26), phase 2);
+- **MODIS and the near-real-time area API**: every case is a VIIRS S-NPP
+  archive; the area API is checked live in phase 3.
+
+The data are crops of the open country archives, committed in
+`benchmarks/data/` with their source; `benchmarks/cases.toml` cites the source
+of every range. `make bench` scores them offline, as CI does on every change;
+`uv run python -m benchmarks.fetch` downloads and crops them again.
 
 ---
 
