@@ -5,7 +5,7 @@ name: firms-client
 url: "https://github.com/agent-engineering-studio/firms-client.git"
 landingURL: "https://agentengineering.it/firms-client/"
 releaseDate: "2026-11-25"
-softwareVersion: "0.6.0"
+softwareVersion: "0.7.0"
 platforms: [linux, mac, windows]
 categories: [geographic-information-systems, data-analytics, data-collection]
 developmentStatus: beta
