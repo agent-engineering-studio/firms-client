@@ -242,9 +242,17 @@ needed for the area API, and stays on the server: the model never sees it.
 | `area_digest(bbox, source, days \| start+end, top_events, mask_country)` | the area API, last days or any range; with `mask_country`, without static sources |
 | `season_anomaly(country, year, month, product, bbox, first_year)` | was this year or month unusual? rank, percentile, robust z |
 | `export_geojson(country, year, filename, product, bbox, fires_only)` | a GeoJSON file in `FIRMS_EXPORT_DIR` (default: `exports/` in the data directory) |
+| `fires_in_area(country, year, bbox, start, end, land_cover)` | facts: detections, fires, fire-days, the largest events and what burnt under them |
+| `event_facts(country, year, bbox, start, end, land_cover, places)` | facts for a bulletin about the largest event, with your places |
+| `trust_at(latitude, longitude, mask_country, land_cover)` | facts: how far a detection here reads as a vegetation fire, and the land around |
+| `detection_odds(area_ha)` | facts: how often FIRMS saw an Italian fire of that size |
+| `check_answer(text, answer_facts, lang, question)` | the numbers of a text the facts do not give |
 
-Every tool answers with a `summarize()` digest of a few kilobytes, never raw
-rows, so the numbers an agent quotes are computed here. The server's
+Every tool answers with a `summarize()` digest or with facts
+(`firms_client.facts`) of a few kilobytes, never raw rows, so the numbers an
+agent quotes are computed here. `area_digest(..., land_cover=True)` adds what
+burnt under the largest events. The tools that read land cover need
+`firms-client[landcover]`. The server's
 instructions and the `firms://guide` resource carry the traps (type,
 presence-only, no `type` in near-real-time data) and `firms://attribution`
 carries the NASA acknowledgement. Ask it *"how did the 2021 fire season in
@@ -724,6 +732,58 @@ with the static-source mask, which catches it.
 Reading from the bucket costs about half a second per new 1024-pixel
 block: fine for alerts, slow for a country's whole year. For bulk work,
 copy the tiles you need and pass their directory: `WorldCover(source="…")`.
+
+### Answers as data, for an AI
+
+A model words an answer; it should never make one. `firms_client.facts`
+computes the answer and returns it as a dict, each number next to the window
+and product it describes, the files it was read from, the licence and the
+notes it must be passed on with:
+
+```python
+from datetime import date
+
+from firms_client import VIIRS_SNPP, check_text, facts, fetch_archive
+from firms_client.landcover import WorldCover
+
+rows = await fetch_archive(client, VIIRS_SNPP, 2023, "Italy")  # None if not published
+with WorldCover.synced() as land:
+    answer = facts.area(
+        rows,
+        (13.05, 38.0, 13.5, 38.25),
+        start=date(2023, 7, 23),
+        end=date(2023, 7, 27),
+        product="viirs-snpp",
+        land=land,
+    )
+# {"measured": true, "detections": 318, "fires": 294, "fire_days": 4, "events": 32,
+#  "largest_events": [{..., "hotspots": 84, "land": {...}}],
+#  "window": {...}, "sources": [...], "licence": [...], "notes": [...]}
+
+text = my_model(question, answer)  # any model, any prompt
+check_text(text, answer, lang="it")  # ["318"] if it wrote 318 fires: not a figure of the facts
+```
+
+- `facts.area`, `facts.place` (how far to trust a detection here, and the
+  land), `facts.event` (the bulletin facts of one event, with what burnt)
+  and `facts.seen` (how often FIRMS sees a fire of that size).
+- **Not measured is not zero.** `facts.area(None, ...)`, for an archive not
+  published, says `"measured": false` with null counts; a place with no mask
+  and no land cover has a null score. A text that writes "0 fires" there is
+  wrong, and `check_text` flags the 0.
+- `check_text` reads English and Italian numbers, percentages as shares and
+  dates as their parts; numbers of the question are allowed. It cannot tell
+  a number said of the wrong fact: 318 *fires* when 318 are the
+  *detections* passes.
+
+`benchmarks/faithful.json` measures that last part: nine questions, in
+English and Italian, on the crops of the known cases, each with a faithful
+and a faulty answer written by hand, every number labelled with the fact it
+is said of. `make faithful` (CI) scores them: faithful, approximate (a round
+number), question, and the faults unmeasured, rounded, swapped, invented.
+On the faulty answers `check_text` alone catches 13 of the 21 faults; the 8
+it misses are numbers that exist in the facts, said of the wrong one. A
+model's answers can be added with `ask` and `label` (paid, #24).
 
 ### Grounded alert bulletins
 

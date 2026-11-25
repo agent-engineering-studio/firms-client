@@ -1,0 +1,1292 @@
+{
+  "cases": [
+    {
+      "id": "taranto-steelworks",
+      "lang": "en",
+      "tool": "trust_at",
+      "question": "A satellite saw a fire at the Taranto steelworks. Is it a wildfire?",
+      "args": {
+        "crop": "taranto",
+        "lat": 40.515,
+        "lon": 17.195,
+        "mask": true
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "No. The place is a static heat source in the mask learned from the archives: they saw it hot on 537 fire-days over 13 years, so a detection there is most likely the steelworks, not a wildfire. The reliability score is 0.0, below the 0.5 from which a detection counts as reliable. The mask covers 2012 to 2024. A detection is not an alert.",
+          "said": [
+            {
+              "number": "537",
+              "of": "reliability.reasons.0"
+            },
+            {
+              "number": "13",
+              "of": "reliability.reasons.0"
+            },
+            {
+              "number": "0.0",
+              "of": "reliability.score"
+            },
+            {
+              "number": "0.5",
+              "of": "reliability.reliable_from"
+            },
+            {
+              "number": "2012",
+              "of": "sources.static_mask.years.0"
+            },
+            {
+              "number": "2024",
+              "of": "sources.static_mask.years.1"
+            }
+          ],
+          "expect": {
+            "faithful": 6
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "Probably not: the steelworks was hot on 573 fire-days over 13 years, and the reliability score is 0.5, the threshold. The mask covers 2012 to 2025.",
+          "said": [
+            {
+              "number": "573",
+              "of": "reliability.reasons.0"
+            },
+            {
+              "number": "13",
+              "of": "reliability.reasons.0"
+            },
+            {
+              "number": "0.5",
+              "of": "reliability.score"
+            },
+            {
+              "number": "2012",
+              "of": "sources.static_mask.years.0"
+            },
+            {
+              "number": "2025",
+              "of": "sources.static_mask.years.1"
+            }
+          ],
+          "expect": {
+            "faithful": 2,
+            "swapped": 1,
+            "invented": 2
+          }
+        }
+      ],
+      "facts": {
+        "answer": "trust_at",
+        "latitude": 40.515,
+        "longitude": 17.195,
+        "measured": true,
+        "reliability": {
+          "score": 0.0,
+          "reliable": false,
+          "reliable_from": 0.5,
+          "parts": {
+            "static": 0.0,
+            "land": null
+          },
+          "reasons": [
+            "static land source: 537 fire-days over 13 years in the archives"
+          ]
+        },
+        "land_cover": null,
+        "radius_m": 500.0,
+        "sources": {
+          "static_mask": {
+            "country": "Italy",
+            "years": [
+              2012,
+              2024
+            ]
+          },
+          "land_cover": null
+        },
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters."
+        ],
+        "notes": [
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    },
+    {
+      "id": "aragona-campi",
+      "lang": "it",
+      "tool": "trust_at",
+      "question": "Un punto caldo vicino ad Aragona, in Sicilia: quanto possiamo fidarci che sia un incendio di vegetazione?",
+      "args": {
+        "crop": "aragona-2024",
+        "lat": 37.445,
+        "lon": 13.63,
+        "land": true
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "Sì, con buona fiducia: entro 500 metri dal punto la terra è per l'87,6% coltivi e per il 12,3% prato, secondo ESA WorldCover 2021. Il punteggio di affidabilità è 1,0, sopra la soglia di 0,5; la maschera delle sorgenti fisse non è stata letta. Su terra coltivata il fuoco può essere un rogo agricolo, e una rilevazione non è un'allerta.",
+          "said": [
+            {
+              "number": "500",
+              "of": "radius_m"
+            },
+            {
+              "number": "87,6",
+              "of": "land_cover.cropland"
+            },
+            {
+              "number": "12,3",
+              "of": "land_cover.grassland"
+            },
+            {
+              "number": "2021",
+              "of": "sources.land_cover"
+            },
+            {
+              "number": "1,0",
+              "of": "reliability.score"
+            },
+            {
+              "number": "0,5",
+              "of": "reliability.reliable_from"
+            }
+          ],
+          "expect": {
+            "faithful": 6
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "Sì: l'87% del terreno è coltivato e il punteggio di affidabilità è 0,5. La maschera delle sorgenti fisse del 2024 non segnala nulla nel punto.",
+          "said": [
+            {
+              "number": "87",
+              "of": "land_cover.cropland"
+            },
+            {
+              "number": "0,5",
+              "of": "reliability.score"
+            },
+            {
+              "number": "2024",
+              "of": "sources.static_mask"
+            }
+          ],
+          "expect": {
+            "rounded": 1,
+            "swapped": 1,
+            "unmeasured": 1
+          }
+        }
+      ],
+      "facts": {
+        "answer": "trust_at",
+        "latitude": 37.445,
+        "longitude": 13.63,
+        "measured": true,
+        "reliability": {
+          "score": 1.0,
+          "reliable": true,
+          "reliable_from": 0.5,
+          "parts": {
+            "static": null,
+            "land": 1.0
+          },
+          "reasons": []
+        },
+        "land_cover": {
+          "cropland": 0.876,
+          "grassland": 0.123
+        },
+        "radius_m": 500.0,
+        "sources": {
+          "static_mask": null,
+          "land_cover": "ESA WorldCover 2021 v200"
+        },
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters.",
+          "ESA WorldCover 10 m 2021 v200, © ESA WorldCover project / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. CC BY 4.0."
+        ],
+        "notes": [
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    },
+    {
+      "id": "tirreno-sea",
+      "lang": "en",
+      "tool": "fires_in_area",
+      "question": "Were there fires in the open sea between Sardinia and Lazio in July 2021?",
+      "args": {
+        "crop": "tirreno",
+        "box": [
+          10.5,
+          39.5,
+          11.5,
+          40.5
+        ],
+        "window": [
+          "2021-07-01",
+          "2021-07-31"
+        ],
+        "archive": "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2021/viirs-snpp_2021_Italy.csv"
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "FIRMS saw nothing in that box from 2021-07-01 to 2021-07-31: 0 detections, 0 fires, 0 events. FIRMS is presence-only, so no detection is not proof that nothing burnt, though in the open sea there is nothing to burn.",
+          "said": [
+            {
+              "number": "2021",
+              "of": "window.start"
+            },
+            {
+              "number": "07",
+              "of": "window.start"
+            },
+            {
+              "number": "01",
+              "of": "window.start"
+            },
+            {
+              "number": "2021",
+              "of": "window.end"
+            },
+            {
+              "number": "07",
+              "of": "window.end"
+            },
+            {
+              "number": "31",
+              "of": "window.end"
+            },
+            {
+              "number": "0",
+              "of": "detections"
+            },
+            {
+              "number": "0",
+              "of": "fires"
+            },
+            {
+              "number": "0",
+              "of": "events"
+            }
+          ],
+          "expect": {
+            "faithful": 9
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "There were 0 fires in July 2021 over 28 days, and 3 detections were offshore platforms.",
+          "said": [
+            {
+              "number": "0",
+              "of": "fires"
+            },
+            {
+              "number": "2021",
+              "of": "window.start"
+            },
+            {
+              "number": "28",
+              "of": "window"
+            },
+            {
+              "number": "3",
+              "of": "by_type.offshore"
+            }
+          ],
+          "expect": {
+            "faithful": 2,
+            "invented": 2
+          }
+        }
+      ],
+      "facts": {
+        "answer": "fires_in_area",
+        "box": [
+          10.5,
+          39.5,
+          11.5,
+          40.5
+        ],
+        "window": {
+          "start": "2021-07-01",
+          "end": "2021-07-31"
+        },
+        "product": "viirs-snpp",
+        "sources": [
+          "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2021/viirs-snpp_2021_Italy.csv"
+        ],
+        "measured": true,
+        "detections": 0,
+        "fires": 0,
+        "fire_days": 0,
+        "events": 0,
+        "by_type": {
+          "vegetation_fire": 0,
+          "active_volcano": 0,
+          "static_land_source": 0,
+          "offshore": 0,
+          "unknown": 0
+        },
+        "largest_events": [],
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters."
+        ],
+        "notes": [
+          "FIRMS is presence-only: no detection does not mean no fire (clouds, smoke and the overpass time hide fires).",
+          "Detections are hot pixels, not fires: one fire is often many detections; events group neighbouring detections in space and time.",
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    },
+    {
+      "id": "palermo-2023",
+      "lang": "it",
+      "tool": "fires_in_area",
+      "question": "Quanti incendi ha visto il satellite attorno a Palermo tra il 23 e il 27 luglio 2023?",
+      "args": {
+        "crop": "palermo",
+        "box": [
+          13.05,
+          38.0,
+          13.5,
+          38.25
+        ],
+        "window": [
+          "2023-07-23",
+          "2023-07-27"
+        ],
+        "archive": "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2023/viirs-snpp_2023_Italy.csv"
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "Tra il 23 e il 27 luglio 2023 FIRMS ha registrato 318 rilevazioni nel riquadro attorno a Palermo; 294 restano come incendi di vegetazione, in 4 giorni con fuoco, raggruppate in 32 eventi. Il più grande, il 25 e 26 luglio, ha 84 rilevazioni e una potenza di picco di 167,93 MW. Sono pixel caldi, non allerte.",
+          "said": [
+            {
+              "number": "23",
+              "of": null
+            },
+            {
+              "number": "27",
+              "of": null
+            },
+            {
+              "number": "2023",
+              "of": null
+            },
+            {
+              "number": "318",
+              "of": "detections"
+            },
+            {
+              "number": "294",
+              "of": "fires"
+            },
+            {
+              "number": "4",
+              "of": "fire_days"
+            },
+            {
+              "number": "32",
+              "of": "events"
+            },
+            {
+              "number": "25",
+              "of": "largest_events.0.start"
+            },
+            {
+              "number": "26",
+              "of": "largest_events.0.end"
+            },
+            {
+              "number": "84",
+              "of": "largest_events.0.hotspots"
+            },
+            {
+              "number": "167,93",
+              "of": "largest_events.0.peak_frp_mw"
+            }
+          ],
+          "expect": {
+            "question": 3,
+            "faithful": 8
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "Il satellite ha visto 318 incendi in 5 giorni, divisi in 32 eventi; il più grande aveva 84 rilevazioni e un picco di 168 MW.",
+          "said": [
+            {
+              "number": "318",
+              "of": "fires"
+            },
+            {
+              "number": "5",
+              "of": "fire_days"
+            },
+            {
+              "number": "32",
+              "of": "events"
+            },
+            {
+              "number": "84",
+              "of": "largest_events.0.hotspots"
+            },
+            {
+              "number": "168",
+              "of": "largest_events.0.peak_frp_mw"
+            }
+          ],
+          "expect": {
+            "swapped": 1,
+            "invented": 1,
+            "faithful": 3
+          }
+        }
+      ],
+      "facts": {
+        "answer": "fires_in_area",
+        "box": [
+          13.05,
+          38.0,
+          13.5,
+          38.25
+        ],
+        "window": {
+          "start": "2023-07-23",
+          "end": "2023-07-27"
+        },
+        "product": "viirs-snpp",
+        "sources": [
+          "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2023/viirs-snpp_2023_Italy.csv"
+        ],
+        "measured": true,
+        "detections": 318,
+        "fires": 294,
+        "fire_days": 4,
+        "events": 32,
+        "by_type": {
+          "vegetation_fire": 318,
+          "active_volcano": 0,
+          "static_land_source": 0,
+          "offshore": 0,
+          "unknown": 0
+        },
+        "largest_events": [
+          {
+            "start": "2023-07-25",
+            "end": "2023-07-26",
+            "days": 2,
+            "latitude": 38.16942,
+            "longitude": 13.28639,
+            "bbox": [
+              13.27147,
+              38.14086,
+              13.30455,
+              38.19384
+            ],
+            "hotspots": 84,
+            "overpasses": 2,
+            "peak_frp_mw": 167.93,
+            "total_frp_mw": 1371.76
+          },
+          {
+            "start": "2023-07-25",
+            "end": "2023-07-25",
+            "days": 1,
+            "latitude": 38.10387,
+            "longitude": 13.28766,
+            "bbox": [
+              13.26437,
+              38.09474,
+              13.30269,
+              38.10901
+            ],
+            "hotspots": 20,
+            "overpasses": 2,
+            "peak_frp_mw": 128.65,
+            "total_frp_mw": 510.97
+          },
+          {
+            "start": "2023-07-25",
+            "end": "2023-07-26",
+            "days": 2,
+            "latitude": 38.04202,
+            "longitude": 13.18522,
+            "bbox": [
+              13.17323,
+              38.03228,
+              13.19641,
+              38.05573
+            ],
+            "hotspots": 18,
+            "overpasses": 2,
+            "peak_frp_mw": 21.89,
+            "total_frp_mw": 197.27
+          }
+        ],
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters."
+        ],
+        "notes": [
+          "FIRMS is presence-only: no detection does not mean no fire (clouds, smoke and the overpass time hide fires).",
+          "Detections are hot pixels, not fires: one fire is often many detections; events group neighbouring detections in space and time.",
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    },
+    {
+      "id": "montiferru-2021",
+      "lang": "en",
+      "tool": "fires_in_area",
+      "question": "How large was the Montiferru fire in July 2021, as the satellite saw it?",
+      "args": {
+        "crop": "montiferru",
+        "box": [
+          8.4,
+          40.0,
+          8.8,
+          40.3
+        ],
+        "window": [
+          "2021-07-22",
+          "2021-07-30"
+        ],
+        "archive": "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2021/viirs-snpp_2021_Italy.csv"
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "From 2021-07-22 to 2021-07-30 FIRMS saw 694 detections in the box, 690 of them kept as vegetation fires, on 4 days. The largest event, on 2021-07-25, had 631 detections from 2 overpasses and a total radiative power of 6,880 MW. FIRMS counts hot pixels, not hectares: the burnt area is not in these facts.",
+          "said": [
+            {
+              "number": "2021",
+              "of": "window.start"
+            },
+            {
+              "number": "07",
+              "of": "window.start"
+            },
+            {
+              "number": "22",
+              "of": "window.start"
+            },
+            {
+              "number": "2021",
+              "of": "window.end"
+            },
+            {
+              "number": "07",
+              "of": "window.end"
+            },
+            {
+              "number": "30",
+              "of": "window.end"
+            },
+            {
+              "number": "694",
+              "of": "detections"
+            },
+            {
+              "number": "690",
+              "of": "fires"
+            },
+            {
+              "number": "4",
+              "of": "fire_days"
+            },
+            {
+              "number": "2021",
+              "of": "largest_events.0.start"
+            },
+            {
+              "number": "07",
+              "of": "largest_events.0.start"
+            },
+            {
+              "number": "25",
+              "of": "largest_events.0.start"
+            },
+            {
+              "number": "631",
+              "of": "largest_events.0.hotspots"
+            },
+            {
+              "number": "2",
+              "of": "largest_events.0.overpasses"
+            },
+            {
+              "number": "6,880",
+              "of": "largest_events.0.total_frp_mw"
+            }
+          ],
+          "expect": {
+            "faithful": 15
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "The fire covered 12,000 hectares: FIRMS saw 649 detections, 690 fires, on 8 days.",
+          "said": [
+            {
+              "number": "12,000",
+              "of": null
+            },
+            {
+              "number": "649",
+              "of": "detections"
+            },
+            {
+              "number": "690",
+              "of": "fires"
+            },
+            {
+              "number": "8",
+              "of": "fire_days"
+            }
+          ],
+          "expect": {
+            "invented": 2,
+            "faithful": 1,
+            "swapped": 1
+          }
+        }
+      ],
+      "facts": {
+        "answer": "fires_in_area",
+        "box": [
+          8.4,
+          40.0,
+          8.8,
+          40.3
+        ],
+        "window": {
+          "start": "2021-07-22",
+          "end": "2021-07-30"
+        },
+        "product": "viirs-snpp",
+        "sources": [
+          "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2021/viirs-snpp_2021_Italy.csv"
+        ],
+        "measured": true,
+        "detections": 694,
+        "fires": 690,
+        "fire_days": 4,
+        "events": 11,
+        "by_type": {
+          "vegetation_fire": 694,
+          "active_volcano": 0,
+          "static_land_source": 0,
+          "offshore": 0,
+          "unknown": 0
+        },
+        "largest_events": [
+          {
+            "start": "2021-07-25",
+            "end": "2021-07-25",
+            "days": 1,
+            "latitude": 40.19392,
+            "longitude": 8.5239,
+            "bbox": [
+              8.46266,
+              40.1333,
+              8.5987,
+              40.25679
+            ],
+            "hotspots": 631,
+            "overpasses": 2,
+            "peak_frp_mw": 355.72,
+            "total_frp_mw": 6880.0
+          },
+          {
+            "start": "2021-07-25",
+            "end": "2021-07-25",
+            "days": 1,
+            "latitude": 40.15762,
+            "longitude": 8.64178,
+            "bbox": [
+              8.62386,
+              40.14343,
+              8.65957,
+              40.1683
+            ],
+            "hotspots": 34,
+            "overpasses": 2,
+            "peak_frp_mw": 84.02,
+            "total_frp_mw": 357.83
+          },
+          {
+            "start": "2021-07-24",
+            "end": "2021-07-25",
+            "days": 2,
+            "latitude": 40.12262,
+            "longitude": 8.64635,
+            "bbox": [
+              8.63943,
+              40.11669,
+              8.65539,
+              40.12692
+            ],
+            "hotspots": 8,
+            "overpasses": 2,
+            "peak_frp_mw": 36.05,
+            "total_frp_mw": 157.36
+          }
+        ],
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters."
+        ],
+        "notes": [
+          "FIRMS is presence-only: no detection does not mean no fire (clouds, smoke and the overpass time hide fires).",
+          "Detections are hot pixels, not fires: one fire is often many detections; events group neighbouring detections in space and time.",
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    },
+    {
+      "id": "san-luca-2021",
+      "lang": "en",
+      "tool": "event_facts",
+      "question": "What burnt at San Luca, in Aspromonte, in August 2021?",
+      "args": {
+        "crop": "san-luca-2021",
+        "box": [
+          15.94,
+          38.1,
+          16.02,
+          38.16
+        ],
+        "window": [
+          "2021-08-06",
+          "2021-08-11"
+        ],
+        "land": true
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "The satellite followed this event for 6 days, from 2021-08-06 to 2021-08-11, with 64 detections over 9 overpasses, 50 of them at night. Under the detections the land is natural vegetation: tree cover 93.5%, shrubland 3.9%, grassland 2.4%, so the verdict is wildfire, and the reliability score is 1.0.",
+          "said": [
+            {
+              "number": "6",
+              "of": "event.days"
+            },
+            {
+              "number": "2021",
+              "of": "event.start"
+            },
+            {
+              "number": "08",
+              "of": "event.start"
+            },
+            {
+              "number": "06",
+              "of": "event.start"
+            },
+            {
+              "number": "2021",
+              "of": "event.end"
+            },
+            {
+              "number": "08",
+              "of": "event.end"
+            },
+            {
+              "number": "11",
+              "of": "event.end"
+            },
+            {
+              "number": "64",
+              "of": "event.hotspots"
+            },
+            {
+              "number": "9",
+              "of": "event.overpasses"
+            },
+            {
+              "number": "50",
+              "of": "event.night_detections"
+            },
+            {
+              "number": "93.5",
+              "of": "land_cover.land_cover.tree_cover"
+            },
+            {
+              "number": "3.9",
+              "of": "land_cover.land_cover.shrubland"
+            },
+            {
+              "number": "2.4",
+              "of": "land_cover.land_cover.grassland"
+            },
+            {
+              "number": "1.0",
+              "of": "reliability.score"
+            }
+          ],
+          "expect": {
+            "faithful": 14
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "A wildfire of 6 days, with 64 detections, 14 of them at night, on land that is 100% tree cover.",
+          "said": [
+            {
+              "number": "6",
+              "of": "event.days"
+            },
+            {
+              "number": "64",
+              "of": "event.hotspots"
+            },
+            {
+              "number": "14",
+              "of": "event.night_detections"
+            },
+            {
+              "number": "100",
+              "of": "land_cover.land_cover.tree_cover"
+            }
+          ],
+          "expect": {
+            "faithful": 2,
+            "swapped": 2
+          }
+        }
+      ],
+      "facts": {
+        "answer": "event",
+        "event": {
+          "start": "2021-08-06",
+          "end": "2021-08-11",
+          "days": 6,
+          "latitude": 38.13823,
+          "longitude": 15.9796,
+          "bbox": [
+            15.95567,
+            38.12033,
+            15.99827,
+            38.15579
+          ],
+          "hotspots": 64,
+          "overpasses": 9,
+          "peak_frp_mw": 78.14,
+          "total_frp_mw": 772.5,
+          "first_seen_utc": "2021-08-06T11:34Z",
+          "last_seen_utc": "2021-08-11T11:40Z",
+          "satellites": [
+            "N"
+          ],
+          "day_detections": 14,
+          "night_detections": 50
+        },
+        "region": null,
+        "source": "VIIRS_SNPP_SP",
+        "nearest_places": [],
+        "static_source": null,
+        "season": null,
+        "land_cover": {
+          "kind": "wildfire",
+          "reason": "natural vegetation 100%",
+          "land_cover": {
+            "tree_cover": 0.935,
+            "shrubland": 0.039,
+            "grassland": 0.024
+          },
+          "hotspots_sampled": 10
+        },
+        "caveats": [
+          "Satellite detections of heat, not ground observations; confirm on the ground.",
+          "Detections are hot pixels of about 375 m (VIIRS) or 1 km (MODIS); the extent is approximate.",
+          "FIRMS is presence-only: clouds and smoke can hide parts of a fire.",
+          "What burns is inferred from a land-cover map (ESA WorldCover 2021) under the detections, not observed: fields and forests may have changed since."
+        ],
+        "reliability": {
+          "score": 1.0,
+          "reliable": true,
+          "reliable_from": 0.5,
+          "parts": {
+            "static": null,
+            "land": 1.0
+          },
+          "reasons": []
+        },
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters.",
+          "ESA WorldCover 10 m 2021 v200, © ESA WorldCover project / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. CC BY 4.0."
+        ],
+        "notes": [
+          "FIRMS is presence-only: no detection does not mean no fire (clouds, smoke and the overpass time hide fires).",
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    },
+    {
+      "id": "irsina-2025",
+      "lang": "it",
+      "tool": "event_facts",
+      "question": "Che cosa è bruciato a Irsina il 3 luglio 2025?",
+      "args": {
+        "crop": "irsina-2025",
+        "box": [
+          16.21,
+          40.79,
+          16.27,
+          40.84
+        ],
+        "window": [
+          "2025-07-02",
+          "2025-07-04"
+        ],
+        "land": true
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "Il 3 luglio 2025 FIRMS ha visto 31 rilevazioni in 2 passaggi, tutte di giorno. Sotto i punti la terra è per il 90,6% coltivi, il 7,7% prato e l'1,3% bosco: la libreria lo classifica come incendio su terra agricola (cropland_fire) e non come rogo di stoppie, perché è troppo esteso. Dai dati non si sa perché il campo abbia bruciato.",
+          "said": [
+            {
+              "number": "3",
+              "of": null
+            },
+            {
+              "number": "2025",
+              "of": null
+            },
+            {
+              "number": "31",
+              "of": "event.hotspots"
+            },
+            {
+              "number": "2",
+              "of": "event.overpasses"
+            },
+            {
+              "number": "90,6",
+              "of": "land_cover.land_cover.cropland"
+            },
+            {
+              "number": "7,7",
+              "of": "land_cover.land_cover.grassland"
+            },
+            {
+              "number": "1,3",
+              "of": "land_cover.land_cover.tree_cover"
+            }
+          ],
+          "expect": {
+            "question": 2,
+            "faithful": 5
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "Il 3 luglio 2025 è bruciato un bosco: 31 rilevazioni, il 91% della terra era bosco e l'incendio è durato 2 giorni.",
+          "said": [
+            {
+              "number": "3",
+              "of": null
+            },
+            {
+              "number": "2025",
+              "of": null
+            },
+            {
+              "number": "31",
+              "of": "event.hotspots"
+            },
+            {
+              "number": "91",
+              "of": "land_cover.land_cover.tree_cover"
+            },
+            {
+              "number": "2",
+              "of": "event.days"
+            }
+          ],
+          "expect": {
+            "question": 2,
+            "faithful": 1,
+            "swapped": 2
+          }
+        }
+      ],
+      "facts": {
+        "answer": "event",
+        "event": {
+          "start": "2025-07-03",
+          "end": "2025-07-03",
+          "days": 1,
+          "latitude": 40.81949,
+          "longitude": 16.24815,
+          "bbox": [
+            16.23427,
+            40.8031,
+            16.26409,
+            40.82947
+          ],
+          "hotspots": 31,
+          "overpasses": 2,
+          "peak_frp_mw": 36.28,
+          "total_frp_mw": 481.55,
+          "first_seen_utc": "2025-07-03T10:40Z",
+          "last_seen_utc": "2025-07-03T12:20Z",
+          "satellites": [
+            "N"
+          ],
+          "day_detections": 31,
+          "night_detections": 0
+        },
+        "region": null,
+        "source": "VIIRS_SNPP_SP",
+        "nearest_places": [],
+        "static_source": null,
+        "season": null,
+        "land_cover": {
+          "kind": "cropland_fire",
+          "reason": "cropland 91%, natural vegetation 9%, 31 hotspots over 1 day",
+          "land_cover": {
+            "cropland": 0.906,
+            "grassland": 0.077,
+            "tree_cover": 0.013
+          },
+          "hotspots_sampled": 8
+        },
+        "caveats": [
+          "Satellite detections of heat, not ground observations; confirm on the ground.",
+          "Detections are hot pixels of about 375 m (VIIRS) or 1 km (MODIS); the extent is approximate.",
+          "FIRMS is presence-only: clouds and smoke can hide parts of a fire.",
+          "What burns is inferred from a land-cover map (ESA WorldCover 2021) under the detections, not observed: fields and forests may have changed since."
+        ],
+        "reliability": {
+          "score": 1.0,
+          "reliable": true,
+          "reliable_from": 0.5,
+          "parts": {
+            "static": null,
+            "land": 1.0
+          },
+          "reasons": []
+        },
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters.",
+          "ESA WorldCover 10 m 2021 v200, © ESA WorldCover project / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. CC BY 4.0."
+        ],
+        "notes": [
+          "FIRMS is presence-only: no detection does not mean no fire (clouds, smoke and the overpass time hide fires).",
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    },
+    {
+      "id": "seen-monte-verna",
+      "lang": "en",
+      "tool": "seen",
+      "question": "How likely is FIRMS to see a fire of 542 hectares?",
+      "args": {
+        "area_ha": 542
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "In Italy, 2022-2025, VIIRS saw 132 of the 152 EFFIS burnt areas of 300 to 1,000 ha: 86.8%, about 87%. So a fire of 542 hectares is usually seen, but not always: no detection is not no fire. 11 fires fell on days with no data.",
+          "said": [
+            {
+              "number": "2022",
+              "of": "period"
+            },
+            {
+              "number": "2025",
+              "of": "period"
+            },
+            {
+              "number": "132",
+              "of": "seen"
+            },
+            {
+              "number": "152",
+              "of": "perimeters"
+            },
+            {
+              "number": "300",
+              "of": "size_class.from_ha"
+            },
+            {
+              "number": "1,000",
+              "of": "size_class.to_ha"
+            },
+            {
+              "number": "86.8",
+              "of": "share"
+            },
+            {
+              "number": "87",
+              "of": "share"
+            },
+            {
+              "number": "542",
+              "of": null
+            },
+            {
+              "number": "11",
+              "of": "no_data"
+            }
+          ],
+          "expect": {
+            "faithful": 9,
+            "question": 1
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "FIRMS sees 86% of fires this size: 132 of 125 burnt areas.",
+          "said": [
+            {
+              "number": "86",
+              "of": "share"
+            },
+            {
+              "number": "132",
+              "of": "seen"
+            },
+            {
+              "number": "125",
+              "of": "perimeters"
+            }
+          ],
+          "expect": {
+            "rounded": 1,
+            "faithful": 1,
+            "invented": 1
+          }
+        }
+      ],
+      "facts": {
+        "answer": "seen",
+        "area_ha": 542,
+        "size_class": {
+          "from_ha": 300.0,
+          "to_ha": 1000.0
+        },
+        "period": "2022-2025",
+        "country": "Italy",
+        "product": "viirs-snpp",
+        "perimeters": 152,
+        "seen": 132,
+        "share": 0.868,
+        "no_data": 11,
+        "sources": [
+          "EFFIS burnt areas (JRC)",
+          "NASA FIRMS archives",
+          "data/detection.json"
+        ],
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters."
+        ],
+        "notes": [
+          "FIRMS is presence-only: no detection does not mean no fire (clouds, smoke and the overpass time hide fires)."
+        ]
+      }
+    },
+    {
+      "id": "unmeasured-2027",
+      "lang": "it",
+      "tool": "fires_in_area",
+      "question": "Quanti incendi ci sono stati attorno a Palermo nel luglio 2027?",
+      "args": {
+        "crop": null,
+        "box": [
+          13.05,
+          38.0,
+          13.5,
+          38.25
+        ],
+        "window": [
+          "2027-07-01",
+          "2027-07-31"
+        ],
+        "archive": "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2027/viirs-snpp_2027_Italy.csv"
+      },
+      "answers": [
+        {
+          "by": "hand",
+          "text": "Per luglio 2027 non c'è un archivio FIRMS da leggere: il numero di incendi non è misurato, e questo non vuol dire zero.",
+          "said": [
+            {
+              "number": "2027",
+              "of": null
+            }
+          ],
+          "expect": {
+            "question": 1
+          }
+        },
+        {
+          "by": "hand-faulty",
+          "text": "Nel luglio 2027 attorno a Palermo il satellite non ha visto incendi: 0 rilevazioni e 0 eventi.",
+          "said": [
+            {
+              "number": "2027",
+              "of": null
+            },
+            {
+              "number": "0",
+              "of": "detections"
+            },
+            {
+              "number": "0",
+              "of": "events"
+            }
+          ],
+          "expect": {
+            "question": 1,
+            "unmeasured": 2
+          }
+        }
+      ],
+      "facts": {
+        "answer": "fires_in_area",
+        "box": [
+          13.05,
+          38.0,
+          13.5,
+          38.25
+        ],
+        "window": {
+          "start": "2027-07-01",
+          "end": "2027-07-31"
+        },
+        "product": "viirs-snpp",
+        "sources": [
+          "https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/2027/viirs-snpp_2027_Italy.csv"
+        ],
+        "measured": false,
+        "detections": null,
+        "fires": null,
+        "fire_days": null,
+        "events": null,
+        "by_type": null,
+        "largest_events": [],
+        "licence": [
+          "We acknowledge the use of data and imagery from LANCE FIRMS operated by NASA's Earth Science Data and Information System (ESDIS) with funding provided by NASA Headquarters."
+        ],
+        "notes": [
+          "Not measured is not zero: a null number means there was nothing to read here, not that nothing burnt.",
+          "FIRMS is presence-only: no detection does not mean no fire (clouds, smoke and the overpass time hide fires).",
+          "Detections are hot pixels, not fires: one fire is often many detections; events group neighbouring detections in space and time.",
+          "A detection is a hot pixel seen from space, not an alert: fires are confirmed on the ground, and warnings come from Civil Protection."
+        ]
+      }
+    }
+  ]
+}

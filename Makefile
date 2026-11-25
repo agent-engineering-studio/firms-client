@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help check lint format typecheck test test-core live build docs bench bench-data clean
+.PHONY: help check lint format typecheck test test-core live build docs bench faithful bench-data clean
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -31,6 +31,9 @@ bench: ## Score the known cases offline, as CI does: any change from results.jso
 
 # The open country archives (~30 MB, once, into $DATA_ROOT/firms-client), EFFIS perimeters
 # and WorldCover windows: no key needed.
+faithful: ## Score the hand answers against the facts, as CI does (no key, no network)
+	uv run --all-extras python -m benchmarks.faithful score --check
+
 bench-data: ## Download and crop the data of the known cases again, then score them
 	uv run --all-extras python -m benchmarks.fetch
 	uv run --all-extras python -m benchmarks.run
@@ -49,6 +52,7 @@ docs: ## The site with the API reference, in _site/
 	rm -rf _site
 	mkdir -p _site
 	cp docs/*.html docs/*.css docs/llms.txt _site/
+	cat docs/llms.txt README.md skills/firms-client/SKILL.md > _site/llms-full.txt
 	cp -r docs/images _site/images
 	uv run --all-extras --group docs pdoc firms_client -o _site/api
 

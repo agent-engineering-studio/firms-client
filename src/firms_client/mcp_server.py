@@ -31,8 +31,10 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 
-from firms_client import __version__
+from firms_client import __version__, facts
 from firms_client.anomaly import season_anomaly
+from firms_client.bulletin import Place
+from firms_client.check import check_text
 from firms_client.client import (
     ENV_MAP_KEY,
     default_directory,
@@ -42,15 +44,18 @@ from firms_client.client import (
     map_key_from_env,
 )
 from firms_client.errors import FirmsError
+from firms_client.events import cluster
 from firms_client.export import to_geojson
 from firms_client.hotspots import Hotspot, select, within
 from firms_client.mask import fetch_static_mask
 from firms_client.retry import RetryPolicy
-from firms_client.sources import ARCHIVE_PRODUCTS, BBox, archive_years
+from firms_client.sources import ARCHIVE_PRODUCTS, BBox, archive_url, archive_years
 from firms_client.summary import ATTRIBUTION, TYPE_NAMES, summarize
 
 if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
+
+    from firms_client.landcover import LandCover
 
 #: Where the MAP_KEY comes from.
 #: Where GeoJSON exports may be written.
@@ -89,8 +94,16 @@ NASA FIRMS active-fire detections, through firms-client {__version__}.
   type, so industry shows up as fire there: pass mask_country to area_digest
   to drop it with a static-source mask learned from the archives.
 - A lava flow outside the volcano mask is type 0 (vegetation) too.
-- FIRMS is presence-only: no detection does not mean no fire.
-- Quote numbers from tool results only. Pass on the caveats.
+- FIRMS is presence-only: no detection does not mean no fire. detection_odds
+  says how often FIRMS saw a fire of a given size in Italy.
+- The *_facts and trust_at tools answer as data: every number with its window,
+  sources, licence and notes. "measured": false and null numbers mean nothing
+  was read: say "not measured", never 0.
+- What burnt is inferred from ESA WorldCover 2021 under the detections
+  (land_cover): fields burn too, and the land says what burnt, not why.
+- Quote numbers from tool results only, and pass the text you wrote with the
+  facts to check_answer before showing it: it lists the numbers the facts do
+  not give. Pass on the notes.
 - Anything published with these data must acknowledge NASA FIRMS:
   {ATTRIBUTION}
 """
@@ -188,12 +201,15 @@ async def area_digest(
     end: date | None = None,
     top_events: int = 10,
     mask_country: str | None = None,
+    land_cover: bool = False,
 ) -> dict[str, Any]:
     """The digest of the area API over ``bbox``: the last ``days``, or ``start`` to ``end``.
 
     With ``mask_country``, rows without ``type`` get it from that country's
     static-source mask (built from its archives on first use, then cached),
-    so that industry and volcanoes drop out of the fires.
+    so that industry and volcanoes drop out of the fires. With
+    ``land_cover``, each of the largest events gets what burnt under it
+    (:func:`~firms_client.classify_burning`, the ``landcover`` extra).
     """
     area = _bbox(bbox)
     if area is None:
@@ -225,6 +241,14 @@ async def area_digest(
         }
     radius = _radius("modis" if source.startswith("MODIS") else "viirs-snpp")
     digest = summarize(rows, top_events=top_events, radius_m=radius)
+    if land_cover:
+        from firms_client.landcover import classify_burning
+
+        events = cluster(select(rows), radius_m=radius)[:top_events]
+        with _land(True) as land:
+            assert land is not None
+            for item, event in zip(digest["events"]["largest"], events, strict=True):
+                item["land"] = classify_burning(event, land).as_dict()
     query = {"source": source, "bbox": area, **window, "mask_country": mask_country}
     if mask_info is not None:
         digest["caveats"] = [c for c in digest["caveats"] if "have no type" not in c] + [
@@ -301,6 +325,134 @@ async def export_geojson(
     path = folder / filename
     path.write_text(json.dumps(to_geojson(rows)), encoding="utf-8")
     return {"path": str(path), "features": len(rows), "attribution": ATTRIBUTION}
+
+
+@contextlib.contextmanager
+def _land(enabled: bool) -> Iterator[LandCover | None]:
+    """WorldCover from the data directory (``firms init``), else its public bucket."""
+    if not enabled:
+        yield None
+        return
+    import importlib.util
+
+    if importlib.util.find_spec("rasterio") is None:
+        raise FirmsError(
+            "land cover needs the landcover extra: pip install 'firms-client[landcover]'"
+        )
+    from firms_client.landcover import WorldCover
+
+    with WorldCover.synced() as land:
+        yield land
+
+
+def _window(year: int, start: date | None, end: date | None) -> tuple[date, date]:
+    first, last = start or date(year, 1, 1), end or date(year, 12, 31)
+    if first.year != year or last.year != year or first > last:
+        raise ValueError(f"start and end must be inside {year}, start first")
+    return first, last
+
+
+async def fires_in_area(
+    client: httpx.AsyncClient,
+    country: str,
+    year: int,
+    bbox: Sequence[float],
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    product: Product = "viirs-snpp",
+    land_cover: bool = False,
+    top_events: int = 3,
+) -> dict[str, Any]:
+    """:func:`firms_client.facts.area` on a country's archive; not measured if not published."""
+    area = _bbox(bbox)
+    if area is None:
+        raise ValueError("bbox is required")
+    first, last = _window(year, start, end)
+    archive = _PRODUCTS[product]
+    rows = await fetch_archive(client, archive, year, country, retry=_RETRY)
+    with _land(land_cover and rows is not None) as land:
+        found = facts.area(
+            rows,
+            area,
+            start=first,
+            end=last,
+            product=product,
+            sources=[archive_url(archive, year, country)],
+            land=land,
+            top_events=top_events,
+            radius_m=_radius(product),
+        )
+    if rows is None:
+        found["not_measured_because"] = _not_published(product, year, country)
+    return found
+
+
+async def event_facts(
+    client: httpx.AsyncClient,
+    country: str,
+    year: int,
+    bbox: Sequence[float],
+    *,
+    start: date | None = None,
+    end: date | None = None,
+    product: Product = "viirs-snpp",
+    land_cover: bool = True,
+    places: Sequence[dict[str, Any]] = (),
+) -> dict[str, Any]:
+    """:func:`firms_client.facts.event` for the largest fire event in a box and window.
+
+    ``places`` is your gazetteer, ``{"name", "latitude", "longitude", "kind"?}``:
+    the facts name the nearest ones, so that a bulletin can say where.
+    """
+    area = _bbox(bbox)
+    if area is None:
+        raise ValueError("bbox is required")
+    first, last = _window(year, start, end)
+    rows = await fetch_archive(client, _PRODUCTS[product], year, country, retry=_RETRY)
+    if rows is None:
+        raise FirmsError(_not_published(product, year, country))
+    kept = [h for h in select(within(rows, area)) if first <= h.acq_date <= last]
+    events = cluster(kept, radius_m=_radius(product))
+    if not events:
+        raise FirmsError(
+            f"no vegetation fire in {list(area)} from {first} to {last}: FIRMS is "
+            "presence-only, so this is not proof that nothing burnt"
+        )
+    gazetteer = [Place(**p) for p in places]
+    with _land(land_cover) as land:
+        return facts.event(events[0], places=gazetteer, land=land, source=product)
+
+
+async def trust_at(
+    client: httpx.AsyncClient,
+    latitude: float,
+    longitude: float,
+    *,
+    mask_country: str | None = None,
+    land_cover: bool = True,
+) -> dict[str, Any]:
+    """:func:`firms_client.facts.place`: how far a detection here reads as a vegetation fire."""
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise ValueError("latitude is -90 to 90, longitude -180 to 180")
+    mask = None
+    if mask_country is not None:
+        mask = await fetch_static_mask(client, mask_country, retry=_RETRY)
+    with _land(land_cover) as land:
+        return facts.place(latitude, longitude, mask=mask, land=land)
+
+
+def check_answer(
+    text: str, answer_facts: dict[str, Any], *, lang: Literal["en", "it"] = "en", question: str = ""
+) -> dict[str, Any]:
+    """The numbers of ``text`` that ``answer_facts`` do not give, to the decimals written."""
+    unfound = check_text(text, answer_facts, lang=lang, question=question)
+    return {
+        "faithful": not unfound,
+        "not_in_facts": unfound,
+        "note": "Only the numbers are checked: a number said of the wrong fact, or a null "
+        "written as 0, may still pass. Reread those against the facts.",
+    }
 
 
 def export_directory() -> Path:
@@ -410,6 +562,7 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
         end: date | None = None,
         top_events: int = 10,
         mask_country: str | None = None,
+        land_cover: bool = False,
     ) -> dict[str, Any]:
         """Detections over a bounding box: the last 1-5 days, or start to end.
 
@@ -418,6 +571,8 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
         like fires: pass mask_country (the country the bbox is in, e.g. Italy) to
         drop them with a static-source mask learned from that country's archives.
         The first masked call for a country downloads its archives (tens of MB).
+        land_cover: what burnt under each of the largest events (ESA WorldCover):
+        wildfire, crop burning, cropland fire, mixed or other.
         """
         with anticipated():
             async with client() as c:
@@ -431,6 +586,7 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
                     end=end,
                     top_events=top_events,
                     mask_country=mask_country,
+                    land_cover=land_cover,
                 )
 
     @server.tool(name="export_geojson")
@@ -477,6 +633,113 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
                     bbox=bbox,
                     first_year=first_year,
                 )
+
+    @server.tool(name="fires_in_area")
+    async def _fires_in_area(
+        country: str,
+        year: int,
+        bbox: list[float],
+        start: date | None = None,
+        end: date | None = None,
+        product: Product = "viirs-snpp",
+        land_cover: bool = False,
+        top_events: int = 3,
+    ) -> dict[str, Any]:
+        """Facts: the fires FIRMS saw in a box, start to end of one archive year (no key).
+
+        Detections, fires, fire-days, events and the largest ones, with window,
+        sources, licence and notes. land_cover: what burnt under the largest
+        events (ESA WorldCover). A year not published comes back with
+        "measured": false and null counts: not measured, never 0.
+        """
+        with anticipated():
+            async with client() as c:
+                return await fires_in_area(
+                    c,
+                    country,
+                    year,
+                    bbox,
+                    start=start,
+                    end=end,
+                    product=product,
+                    land_cover=land_cover,
+                    top_events=top_events,
+                )
+
+    @server.tool(name="event_facts")
+    async def _event_facts(
+        country: str,
+        year: int,
+        bbox: list[float],
+        start: date | None = None,
+        end: date | None = None,
+        product: Product = "viirs-snpp",
+        land_cover: bool = True,
+        places: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Facts for a bulletin about the largest fire event in a box and window.
+
+        When it burnt, how many detections, day and night, what land burnt, how far
+        to trust it, the nearest of your places ([{name, latitude, longitude, kind}]).
+        Write the bulletin yourself from these facts only, then call check_answer.
+        """
+        with anticipated():
+            async with client() as c:
+                return await event_facts(
+                    c,
+                    country,
+                    year,
+                    bbox,
+                    start=start,
+                    end=end,
+                    product=product,
+                    land_cover=land_cover,
+                    places=places or (),
+                )
+
+    @server.tool(name="trust_at")
+    async def _trust_at(
+        latitude: float,
+        longitude: float,
+        mask_country: str | None = None,
+        land_cover: bool = True,
+    ) -> dict[str, Any]:
+        """Facts: how far a detection at a place can be read as a vegetation fire, 0 to 1.
+
+        mask_country (e.g. Italy) checks the static-source mask (steelworks, flares,
+        volcanoes; the first call downloads the archives); land_cover reads the land
+        within 500 m. With neither, the place is not measured (score null).
+        """
+        with anticipated():
+            async with client() as c:
+                return await trust_at(
+                    c, latitude, longitude, mask_country=mask_country, land_cover=land_cover
+                )
+
+    @server.tool(name="detection_odds")
+    def _detection_odds(area_ha: float, period: str = "2022-2025") -> dict[str, Any]:
+        """Facts: how often FIRMS (VIIRS S-NPP) saw an Italian fire of this size, with counts.
+
+        Measured on EFFIS burnt areas. Use it before saying anything about a fire
+        FIRMS did not see: no detection is not no fire.
+        """
+        with anticipated():
+            return facts.seen(area_ha, period=period)
+
+    @server.tool(name="check_answer")
+    def _check_answer(
+        text: str,
+        answer_facts: dict[str, Any],
+        lang: Literal["en", "it"] = "en",
+        question: str = "",
+    ) -> dict[str, Any]:
+        """Check a text you wrote against the facts a tool gave: the numbers it does not hold.
+
+        answer_facts: the dict a *_facts, trust_at or detection_odds tool returned.
+        An empty not_in_facts means every number was found, not that each is said
+        of the right fact.
+        """
+        return check_answer(text, answer_facts, lang=lang, question=question)
 
     @server.resource("firms://guide", name="guide", mime_type="text/plain")
     def _guide() -> str:

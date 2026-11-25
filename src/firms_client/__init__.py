@@ -22,6 +22,7 @@ from firms_client.cells import (
     laea,
     laea_inverse,
 )
+from firms_client.check import check_text
 from firms_client.client import (
     ENV_DATA_DIR,
     ENV_DATA_ROOT,
@@ -163,6 +164,7 @@ __all__ = [
     "cell_stats",
     "check_columns",
     "check_grounding",
+    "check_text",
     "classify_burning",
     "cluster",
     "confidence_level",

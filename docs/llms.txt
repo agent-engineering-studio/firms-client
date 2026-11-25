@@ -35,7 +35,7 @@ Key facts an assistant must get right:
 - `firms archive Italy 2025 [--product modis] [--fires] [--format summary|json|csv|geojson]`
 - `firms area --bbox W,S,E,N [--source …] [--days N | --date D | --from D --to D] [--mask COUNTRY] [--key …]` (MAP_KEY from `FIRMS_MAP_KEY`)
 - `firms anomaly COUNTRY YEAR [--month M] [--bbox …]`
-- `pip install 'firms-client[mcp]'`, then `firms-mcp` (stdio). Tools: `fire_history`, `archive_digest`, `area_digest` (with `mask_country`), `season_anomaly`, `export_geojson`. Resources: `firms://guide`, `firms://attribution`. Claude Code: `claude mcp add firms -e FIRMS_MAP_KEY=… -- firms-mcp`.
+- `pip install 'firms-client[mcp]'`, then `firms-mcp` (stdio). Tools: `fire_history`, `archive_digest`, `area_digest` (with `mask_country` and `land_cover`), `season_anomaly`, `export_geojson`, and the facts tools `fires_in_area`, `event_facts`, `trust_at`, `detection_odds`, `check_answer` (below). Resources: `firms://guide`, `firms://attribution`. Claude Code: `claude mcp add firms -e FIRMS_MAP_KEY=… -- firms-mcp`.
 
 ## How far to trust it, and filling the data directory first
 
@@ -46,6 +46,17 @@ Key facts an assistant must get right:
 - `save_worldcover(bbox, directory=None)` -> files: a local copy of WorldCover over a box, under the tiles' names; `WorldCover.synced()` reads it, else the public bucket.
 - CLI: `firms trust LAT LON [--country Italy] [--no-land] [--area-ha N] [--format json]`.
 - `init(directory=None, *, country, years, bbox=None, products=(VIIRS_SNPP,), client=None, retry=None)` -> `InitReport` (`downloaded`, `skipped`, `missing`, `failed` {name: error}, `ok`, `as_dict()`): the yearly archives and the **whole** WorldCover tiles touching `bbox` (3° tiles, Italy 23 tiles / 1.3 GB, under `worldcover/` with the bucket's path, read by `WorldCover.synced()`), into the data directory. Idempotent and resumable (`.part` then rename, files there skipped, a failed file recorded and the rest goes on). Takes the caller's `httpx.AsyncClient`; no retry unless `retry=RetryPolicy()`. Sea tiles do not exist (404): in `missing`, not errors. No rasterio needed. `worldcover_tiles(bbox)` -> the tile URLs; `download_worldcover_tile(client, url, directory=None, *, retry=None)` -> `Path | None` one tile. CLI: `firms init Italy [--years 2012-2025] [--bbox W,S,E,N] [--product all]` (exit 1 if a file failed).
+
+## Answers as data, for an AI
+
+- `firms_client.facts`: answers as JSON-ready dicts, every number with its `window`, `product`, `sources`, `licence` (the NASA FIRMS acknowledgement; plus the ESA WorldCover CC BY 4.0 credit when the land was read) and `notes` (`NOT_MEASURED`, `NOT_AN_ALERT`, presence-only). Pure, no network. A model words the answer; it never makes one.
+- `facts.area(rows, box, *, start, end, product, sources=(), mask=None, land=None, top_events=3)`: detections, fires, fire-days, events and the largest ones (with `land`, what burnt under each). `rows=None` (nothing read, e.g. an archive not published) gives `measured: false` and null counts: **never 0**.
+- `facts.place(lat, lon, *, mask=None, land=None)`: `trust` as facts, with the land cover around the place; no mask and no land: not measured.
+- `facts.event(event, *, places=(), mask=None, land=None, anomaly=None, region=None, source=None)`: the `bulletin_facts` of one event, plus what burnt and the reliability at its centre.
+- `facts.seen(area_ha, *, period="2022-2025")`: how often FIRMS saw a fire of that size, with the counts.
+- `check_text(text, facts, *, lang="en"|"it", question="")` -> the numbers of a text that no figure of the facts gives, to the decimals written (`914` and `913.6` match 913.62, `87%` matches 0.868; Italian `1.234,5`). Numbers of the question are allowed. It cannot see a number said of the wrong fact, nor a null written as 0 when a 0 exists elsewhere in the facts. `firms_client.check` also has `numbers`, `figures`, `at`.
+- MCP: `fires_in_area(country, year, bbox, start?, end?, land_cover?)` and `event_facts(country, year, bbox, …, places?)` on the archives (no key); `trust_at(latitude, longitude, mask_country?, land_cover=True)`; `detection_odds(area_ha)`; `check_answer(text, answer_facts, lang?, question?)`. Land cover needs `firms-client[landcover]` (else a clear tool error) and reads the tiles of `firms init`, else the public bucket.
+- Faithfulness benchmark: `benchmarks/faithful.json` (questions in English and Italian on the benchmark crops, a faithful and a faulty hand answer each), `python -m benchmarks.faithful score --check` in CI. Kinds: faithful, approximate, question, unmeasured, rounded, swapped, invented.
 
 ## What the service has, lacks, and the key
 
@@ -93,6 +104,8 @@ asyncio.run(main())
 
 ## Docs
 
+- [Everything as plain text](https://agentengineering.it/firms-client/llms-full.txt): this file, the README and the skill
+- [Skill](https://github.com/agent-engineering-studio/firms-client/blob/main/skills/firms-client/SKILL.md): for Claude Code and other agents, with the traps
 - [README](https://github.com/agent-engineering-studio/firms-client#readme): full guide, recipes, traps
 - [Site](https://agentengineering.it/firms-client/): overview
 - [API reference](https://agentengineering.it/firms-client/api/firms_client.html): every public name, generated from the docstrings
