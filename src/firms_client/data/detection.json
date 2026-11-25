@@ -1,0 +1,80 @@
+{
+  "country": "Italy",
+  "product": "viirs-snpp",
+  "rule": "at least one select()-ed detection inside the perimeter, from the day before its first date to the day after its last",
+  "truth": "EFFIS burnt-area database, https://maps.effis.emergency.copernicus.eu/effis ms:modis.ba.poly, \u00a9 European Union, CC BY 4.0",
+  "built_on": "2026-11-25",
+  "skipped_geometries": 1,
+  "classes": [
+    {
+      "from_ha": 0.0,
+      "to_ha": 30.0,
+      "periods": {
+        "2016-2021": {
+          "perimeters": 1537,
+          "seen": 536
+        },
+        "2022-2025": {
+          "perimeters": 4204,
+          "seen": 784
+        }
+      }
+    },
+    {
+      "from_ha": 30.0,
+      "to_ha": 100.0,
+      "periods": {
+        "2016-2021": {
+          "perimeters": 1525,
+          "seen": 1068
+        },
+        "2022-2025": {
+          "perimeters": 1298,
+          "seen": 704
+        }
+      }
+    },
+    {
+      "from_ha": 100.0,
+      "to_ha": 300.0,
+      "periods": {
+        "2016-2021": {
+          "perimeters": 755,
+          "seen": 626
+        },
+        "2022-2025": {
+          "perimeters": 520,
+          "seen": 365
+        }
+      }
+    },
+    {
+      "from_ha": 300.0,
+      "to_ha": 1000.0,
+      "periods": {
+        "2016-2021": {
+          "perimeters": 214,
+          "seen": 197
+        },
+        "2022-2025": {
+          "perimeters": 163,
+          "seen": 133
+        }
+      }
+    },
+    {
+      "from_ha": 1000.0,
+      "to_ha": null,
+      "periods": {
+        "2016-2021": {
+          "perimeters": 46,
+          "seen": 45
+        },
+        "2022-2025": {
+          "perimeters": 28,
+          "seen": 27
+        }
+      }
+    }
+  ]
+}

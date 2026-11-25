@@ -37,6 +37,15 @@ Key facts an assistant must get right:
 - `firms anomaly COUNTRY YEAR [--month M] [--bbox …]`
 - `pip install 'firms-client[mcp]'`, then `firms-mcp` (stdio). Tools: `fire_history`, `archive_digest`, `area_digest` (with `mask_country`), `season_anomaly`, `export_geojson`. Resources: `firms://guide`, `firms://attribution`. Claude Code: `claude mcp add firms -e FIRMS_MAP_KEY=… -- firms-mcp`.
 
+## How far to trust it, and filling the data directory first
+
+- `trust(latitude, longitude, *, mask=None, land=None, radius_m=500)` -> `Reliability`: how far a detection at a place can be read as a vegetation fire. Parts: `static` (0 in a static cell of the mask, else 1) and `land` (WorldCover around the place, by the rules of `classify_burning`: natural or cropland 1, a cropland-grassland mix 0.3, built-up or bare 0.2, mostly water or snow 0). `score` is the minimum of the known parts, `reliable` is `score >= RELIABLE_FROM` (0.5), `reasons` say why. With no part known, `score` is `None`: **not measured**, never 0 or 1.
+- `seen(area_ha, *, period="2022-2025")` -> `Seen` (`share`, `seen`, `perimeters`, `describe()`): how often VIIRS S-NPP saw a fire of that size, measured on EFFIS burnt areas of Italy (`data/detection.json`, built by `tools/build_detection.py`). 2022-2025: 19% under 30 ha, 54% at 30-100 ha, 70% at 100-300, 82% at 300-1000, 96% from 1000 ha. **No detection is not no fire.** Also `period="2016-2021"`; only Italy.
+- `land_kind(shares, rules=None)` -> `("natural" | "cropland" | "artificial" | "mixed", reason)`: the land rule `classify_burning` and `trust` share.
+- `sync(client, country, *, products=(VIIRS_SNPP,), first_year=None, last_year=None, worldcover=None, directory=None, retry=None)` -> `SyncReport`: download now what the library reads lazily (archives, the static mask, a local WorldCover copy over a box), and write `sync.json`; running it again costs nothing. For servers and offline use. CLI: `firms sync Italy --worldcover W,S,E,N`.
+- `save_worldcover(bbox, directory=None)` -> files: a local copy of WorldCover over a box, under the tiles' names; `WorldCover.synced()` reads it, else the public bucket.
+- CLI: `firms trust LAT LON [--country Italy] [--no-land] [--area-ha N] [--format json]`.
+
 ## The rest of the public API
 
 - Archives: `download_archive(client, product, year, country, directory=None, *, retry=None)` -> `Path | None` (the cached yearly CSV), `fetch_archive_csv(...)` -> `str | None` (its text). `ARCHIVE_PRODUCTS` lists the `ArchiveProduct(slug, first_year)` values (`MODIS` 2000, `VIIRS_SNPP` 2012). `ENV_DATA_DIR` is `"FIRMS_DATA_DIR"`.

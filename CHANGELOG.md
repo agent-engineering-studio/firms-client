@@ -8,6 +8,31 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- How far to trust FIRMS (`firms_client.reliability`), an estimate declared
+  as such. `seen(area_ha)`: how often VIIRS S-NPP saw a fire of that size,
+  measured on 10,290 EFFIS burnt areas of Italy (2022-2025: 19 % under
+  30 ha, 54 % at 30-100, 70 % at 100-300, 82 % at 300-1,000, 96 % from
+  1,000 ha), shipped as `data/detection.json` and built by
+  `tools/build_detection.py`. `trust(lat, lon, mask=, land=)`: whether a
+  detection at a place can be read as a vegetation fire, from the static
+  mask and the land cover, with its reasons; with nothing known, not
+  measured (`None`). `firms trust LAT LON`.
+- `sync()` and `firms sync COUNTRY [--worldcover BBOX]`: download now what
+  the library reads lazily (archives, static mask, a local WorldCover copy),
+  for servers and offline use; idempotent, with a `sync.json` manifest.
+  `save_worldcover`, `WorldCover.synced()`.
+- `land_kind`: the land rule `classify_burning` and `trust` share;
+  `StaticMask.verdict_at(latitude, longitude)`.
+- Benchmark: eight `trust` checks (steelworks, lava, sea, natural land),
+  25 of 31 pass in all.
+
+### Fixed
+
+- `WorldCover.close()` from another thread than the one that read (the
+  `asyncio.to_thread` the docs recommend) raised `EnvError`.
+
+### Added (phases 0 and 1)
+
 - A benchmark of known cases (`benchmarks/`): 23 checks, each with a source
   independent of FIRMS. Two wildfires (Montiferru 2021, Palermo 2023), a
   steelworks (Taranto), a lava flow (Etna, February 2025), the open sea, the

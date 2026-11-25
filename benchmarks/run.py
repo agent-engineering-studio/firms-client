@@ -125,6 +125,30 @@ def _burning(case: dict[str, Any], check: dict[str, Any]) -> float | None:
     return float(verdict.kind in check["kinds"])
 
 
+def _reliable(case: dict[str, Any], check: dict[str, Any]) -> float | None:
+    from firms_client import StaticMask, WorldCover, select, trust
+
+    folder = DATA / case["id"]
+    if "lat" in check:
+        lat, lon = check["lat"], check["lon"]
+    else:  # the middle of the detections inside the perimeter
+        geometry = json.loads((folder / "perimeter.geojson").read_text())["geometry"]
+        rows = [h for h in select(_rows(case)) if inside(h.longitude, h.latitude, geometry)]
+        if not rows:
+            return None
+        lat = sum(h.latitude for h in rows) / len(rows)
+        lon = sum(h.longitude for h in rows) / len(rows)
+    mask = StaticMask.load(folder / "mask.json") if (folder / "mask.json").exists() else None
+    land = WorldCover(str(folder / "worldcover")) if (folder / "worldcover").exists() else None
+    try:
+        found = trust(lat, lon, mask=mask, land=land, radius_m=check.get("radius_m", 300.0))
+    finally:
+        if land is not None:
+            land.close()
+    VERDICTS[f"{case['id']}/{check['name']}"] = "; ".join(found.reasons) or "no reason against"
+    return found.score
+
+
 METHODS: dict[str, Callable[[dict[str, Any], dict[str, Any]], float | None]] = {
     "kept": _kept,
     "events": _events,
@@ -132,6 +156,7 @@ METHODS: dict[str, Callable[[dict[str, Any], dict[str, Any]], float | None]] = {
     "summary": _summary,
     "season": _season,
     "burning": _burning,
+    "reliable": _reliable,
 }
 
 
@@ -160,10 +185,18 @@ def score() -> list[dict[str, Any]]:
                     "measured": None if measured is None else round(measured, DIGITS),
                     "expected": _expected(check),
                     "pass": passes(check, measured),
-                    **({"verdict": VERDICTS[case["id"]]} if check["kind"] == "burning" else {}),
+                    **_verdict(case, check),
                 }
             )
     return rows
+
+
+def _verdict(case: dict[str, Any], check: dict[str, Any]) -> dict[str, str]:
+    if check["kind"] == "burning":
+        return {"verdict": VERDICTS[case["id"]]}
+    if check["kind"] == "reliable":
+        return {"reasons": VERDICTS[f"{case['id']}/{check['name']}"]}
+    return {}
 
 
 def _expected(check: dict[str, Any]) -> str:
@@ -171,7 +204,9 @@ def _expected(check: dict[str, Any]) -> str:
         return "not measured"
     if check["kind"] == "burning":
         return " or ".join(check["kinds"])
-    stat = {"kept": "share kept", "events": "events"}.get(check["kind"]) or check["stat"]
+    stat = {"kept": "share kept", "events": "events", "reliable": "score"}.get(
+        check["kind"]
+    ) or check["stat"]
     low, high = check.get("min"), check.get("max")
     if low is not None and high is not None:
         return f"{low} ≤ {stat} ≤ {high}"

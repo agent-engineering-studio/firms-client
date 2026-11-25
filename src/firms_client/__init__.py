@@ -45,6 +45,8 @@ from firms_client.landcover import (
     WorldCover,
     classify_burning,
     event_land_cover,
+    land_kind,
+    save_worldcover,
 )
 from firms_client.mask import (
     CellVerdict,
@@ -53,6 +55,7 @@ from firms_client.mask import (
     build_static_mask,
     fetch_static_mask,
 )
+from firms_client.reliability import RELIABLE_FROM, Reliability, Seen, seen, trust
 from firms_client.retry import RetryPolicy
 from firms_client.sources import (
     ARCHIVE_PRODUCTS,
@@ -70,6 +73,7 @@ from firms_client.sources import (
     area_windows,
 )
 from firms_client.summary import ATTRIBUTION, TYPE_NAMES, summarize
+from firms_client.sync import SyncReport, sync
 
 __version__ = version("firms-client")
 
@@ -83,6 +87,7 @@ __all__ = [
     "MODIS",
     "NRT_SOURCES",
     "OFFSHORE",
+    "RELIABLE_FROM",
     "SP_SOURCES",
     "STATIC_LAND_SOURCE",
     "TYPE_NAMES",
@@ -104,8 +109,11 @@ __all__ = [
     "Hotspot",
     "MaskRules",
     "Place",
+    "Reliability",
     "RetryPolicy",
+    "Seen",
     "StaticMask",
+    "SyncReport",
     "WorldCover",
     "__version__",
     "anomaly",
@@ -131,12 +139,17 @@ __all__ = [
     "fetch_area_range",
     "fetch_static_mask",
     "is_hotspot_csv",
+    "land_kind",
     "nearest_places",
     "parse_csv",
+    "save_worldcover",
     "season_anomaly",
+    "seen",
     "select",
     "summarize",
+    "sync",
     "to_csv",
     "to_geojson",
+    "trust",
     "within",
 ]

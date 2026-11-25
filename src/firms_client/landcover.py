@@ -29,10 +29,13 @@ extra (``rasterio``); any object with a ``shares`` method will do instead.
 
 from __future__ import annotations
 
+import contextlib
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
+from firms_client.client import default_directory
 from firms_client.events import FireEvent
 
 if TYPE_CHECKING:
@@ -55,8 +58,14 @@ WORLDCOVER_CLASSES = {
 NATURAL = frozenset({10, 20, 30, 90, 95, 100})
 CROPLAND = 40
 ARTIFICIAL = frozenset({50, 60})
+#: Where no vegetation can burn.
+NO_VEGETATION = frozenset({70, 80})
 
 WORLDCOVER_URL = "https://esa-worldcover.s3.eu-central-1.amazonaws.com"
+#: The folder of the data directory that holds a local copy (:func:`save_worldcover`).
+WORLDCOVER_DIR = "worldcover"
+#: Rows copied at a time by :func:`save_worldcover`.
+_BLOCK_ROWS = 1024
 WORLDCOVER_ATTRIBUTION = "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium"  # noqa: E501
 
 Kind = Literal["wildfire", "crop_burning", "cropland_fire", "other", "mixed", "unknown"]
@@ -132,6 +141,28 @@ def _pct(value: float) -> str:
     return f"{100 * value:.0f}%"
 
 
+LandKind = Literal["natural", "cropland", "artificial", "mixed"]
+
+
+def land_kind(shares: dict[int, float], rules: BurningRules | None = None) -> tuple[LandKind, str]:
+    """What land class shares describe, by the rules of :func:`classify_burning`.
+
+    ``natural`` (wildfire land), ``cropland``, ``artificial`` (built-up or
+    bare) or ``mixed``, with the reason in words.
+    """
+    rules = rules or BurningRules()
+    natural = sum(v for cls, v in shares.items() if cls in NATURAL)
+    crop = shares.get(CROPLAND, 0.0)
+    artificial = sum(v for cls, v in shares.items() if cls in ARTIFICIAL)
+    if natural >= rules.natural_share:
+        return "natural", f"natural vegetation {_pct(natural)}"
+    if crop >= rules.crop_share and natural <= rules.crop_natural_max:
+        return "cropland", f"cropland {_pct(crop)}, natural vegetation {_pct(natural)}"
+    if artificial >= rules.artificial_share:
+        return "artificial", f"built-up or bare ground {_pct(artificial)}"
+    return "mixed", f"cropland {_pct(crop)}, natural vegetation {_pct(natural)}"
+
+
 def classify_burning(
     event: FireEvent,
     land: LandCover,
@@ -150,23 +181,19 @@ def classify_burning(
     }
     if not sampled:
         return BurningVerdict("unknown", "no land cover under the hotspots", named, 0)
-    natural = sum(v for cls, v in shares.items() if cls in NATURAL)
-    crop = shares.get(CROPLAND, 0.0)
-    artificial = sum(v for cls, v in shares.items() if cls in ARTIFICIAL)
-    if natural >= rules.natural_share:
-        kind: Kind = "wildfire"
-        reason = f"natural vegetation {_pct(natural)}"
-    elif crop >= rules.crop_share and natural <= rules.crop_natural_max:
+    found, reason = land_kind(shares, rules)
+    kind: Kind
+    if found == "natural":
+        kind = "wildfire"
+    elif found == "cropland":
         small = event.days <= rules.crop_max_days and event.size <= rules.crop_max_hotspots
         kind = "crop_burning" if small else "cropland_fire"
-        size = f"{event.size} hotspots over {event.days} day{'s' if event.days > 1 else ''}"
-        reason = f"cropland {_pct(crop)}, natural vegetation {_pct(natural)}, {size}"
-    elif artificial >= rules.artificial_share:
+        days = f"{event.days} day{'s' if event.days > 1 else ''}"
+        reason = f"{reason}, {event.size} hotspots over {days}"
+    elif found == "artificial":
         kind = "other"
-        reason = f"built-up or bare ground {_pct(artificial)}"
     else:
         kind = "mixed"
-        reason = f"cropland {_pct(crop)}, natural vegetation {_pct(natural)}"
     return BurningVerdict(kind, reason, named, sampled)
 
 
@@ -188,6 +215,12 @@ class WorldCover:
         self.version = "v200" if year == 2021 else "v100"
         self._open: dict[str, DatasetReader | None] = {}
         self._env: Any = None
+
+    @classmethod
+    def synced(cls, directory: Path | None = None, *, year: int = 2021) -> WorldCover:
+        """The local copy :func:`save_worldcover` made in the data directory, else the bucket."""
+        local = (directory or default_directory()) / WORLDCOVER_DIR
+        return cls(str(local) if local.is_dir() else WORLDCOVER_URL, year=year)
 
     def tile(self, latitude: float, longitude: float) -> str:
         """The tile file of a position: ``…_N36E012_Map.tif`` covers 36-39 N, 12-15 E."""
@@ -259,7 +292,11 @@ class WorldCover:
                 dataset.close()
         self._open.clear()
         if self._env is not None:
-            self._env.__exit__(None, None, None)
+            from rasterio.errors import EnvError
+
+            # Opened in another thread (asyncio.to_thread): GDAL's environment is per thread.
+            with contextlib.suppress(EnvError):
+                self._env.__exit__(None, None, None)
             self._env = None
 
     def __enter__(self) -> WorldCover:
@@ -267,3 +304,86 @@ class WorldCover:
 
     def __exit__(self, *exc: object) -> None:
         self.close()
+
+
+def save_worldcover(
+    bbox: tuple[float, float, float, float],
+    directory: Path | None = None,
+    *,
+    year: int = 2021,
+    source: str = WORLDCOVER_URL,
+) -> list[Path]:
+    """Copy WorldCover over ``bbox`` into ``directory/worldcover``, under the tiles' names.
+
+    Then :meth:`WorldCover.synced` (or ``WorldCover(<that folder>)``) reads
+    it without the network. One file per tile the box touches, cut to the
+    box; a file that already covers its part is kept, so running it again
+    costs nothing. Returns the files.
+    """
+    import rasterio
+    from rasterio.windows import Window, from_bounds
+
+    west, south, east, north = bbox
+    if not (west < east and south < north):
+        raise ValueError("bbox is west,south,east,north with west < east and south < north")
+    land = WorldCover(source, year=year)
+    out_root = (directory or default_directory()) / WORLDCOVER_DIR
+    corners = range(math.floor(south / 3) * 3, math.ceil(north / 3) * 3, 3)
+    columns = range(math.floor(west / 3) * 3, math.ceil(east / 3) * 3, 3)
+    written: list[Path] = []
+    for tile_south in corners:
+        for tile_west in columns:
+            part = (
+                max(west, tile_west),
+                max(south, tile_south),
+                min(east, tile_west + 3),
+                min(north, tile_south + 3),
+            )
+            path = land.tile(tile_south + 1.5, tile_west + 1.5)
+            out = out_root / path.removeprefix(land.source + "/")
+            if out.exists() and _covers(out, part):
+                written.append(out)
+                continue
+            dataset = land._dataset(path)
+            if dataset is None:  # open sea: no tile
+                continue
+            window = from_bounds(*part, dataset.transform).round_offsets().round_lengths()
+            window = window.intersection(Window(0, 0, dataset.width, dataset.height))
+            profile = {
+                "driver": "GTiff",
+                "height": window.height,
+                "width": window.width,
+                "count": 1,
+                "dtype": "uint8",
+                "crs": dataset.crs,
+                "transform": dataset.window_transform(window),
+                "nodata": 0,
+                "compress": "deflate",
+                "tiled": True,
+            }
+            out.parent.mkdir(parents=True, exist_ok=True)
+            with rasterio.open(out, "w", **profile) as copy:
+                for row in range(0, window.height, _BLOCK_ROWS):
+                    rows = min(_BLOCK_ROWS, window.height - row)
+                    block = Window(window.col_off, window.row_off + row, window.width, rows)
+                    copy.write(
+                        dataset.read(1, window=block), 1, window=Window(0, row, window.width, rows)
+                    )
+            written.append(out)
+    land.close()
+    return written
+
+
+def _covers(path: Path, part: tuple[float, float, float, float]) -> bool:
+    import rasterio
+
+    with rasterio.open(path) as dataset:
+        left, bottom, right, top = (float(v) for v in dataset.bounds)
+        pixel = abs(float(dataset.transform.a))
+    west, south, east, north = part
+    return (
+        left <= west + pixel
+        and bottom <= south + pixel
+        and right >= east - pixel
+        and top >= north - pixel
+    )

@@ -93,7 +93,11 @@ class StaticMask:
         Its own cell decides when the archives saw it often enough; otherwise
         the most active static neighbour, if any.
         """
-        y, x = self.cell_of(h.latitude, h.longitude)
+        return self.verdict_at(h.latitude, h.longitude)
+
+    def verdict_at(self, latitude: float, longitude: float) -> CellVerdict | None:
+        """The static verdict for a position, by the rule of :meth:`verdict`."""
+        y, x = self.cell_of(latitude, longitude)
         if (y, x) in self.cells:
             return self.cells[(y, x)]
         if (y, x) in self.known:

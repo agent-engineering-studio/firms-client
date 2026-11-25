@@ -37,6 +37,7 @@ One dependency: `httpx`. Website: **[agentengineering.it/firms-client](https://a
 - [Not every hotspot is a fire](#not-every-hotspot-is-a-fire)
 - [How it works](#how-it-works)
 - [Recipes](#recipes)
+- [How far to trust it](#how-far-to-trust-it)
 - [Known cases](#known-cases-what-the-library-gets-right-and-what-it-does-not)
 - [The traps we already fell into](#the-traps-we-already-fell-into)
 - [API at a glance](#api-at-a-glance)
@@ -297,6 +298,31 @@ volumes:
 It is the same convention as
 [egms-client](https://github.com/agent-engineering-studio/egms-client)
 (`EGMS_DATA_DIR`), so one volume can hold both under `/data`.
+
+### Fill it before you need it: `firms sync`
+
+The library reads lazily: an archive the first time it is asked for, the
+static mask the first time it is needed (built from every year, about
+30 MB for Italy), WorldCover a block at a time from ESA's bucket. Fine for
+a script. A server, or a machine that should not reach NASA and ESA while
+it answers, does it all once, before it starts:
+
+```bash
+firms sync Italy                                  # archives 2012-last year + static mask
+firms sync Italy --worldcover 16.4,40.5,16.8,40.8 # + WorldCover over a Comune, for trust()
+firms sync Italy --product all                    # MODIS archives too
+```
+
+It does exactly what the lazy path would, in advance, into the same data
+directory, and writes `sync.json` (what is there, and when). Running it
+again costs nothing: archives on disk are kept, the mask is read back, a
+WorldCover copy that already covers the box is left alone (on Italy: 8 s
+the first time with the archives cached, 0.5 s the second). In Python:
+`await sync(client, "Italy", worldcover=bbox)`. `WorldCover.synced()` reads
+the local copy, and falls back to the bucket where there is none.
+
+The current year is not in the archives, and the area API is never
+cached: those are the live part, and need the network and a MAP_KEY.
 
 ---
 
@@ -712,15 +738,77 @@ rows = parse_csv(requests.get(url, timeout=120).text)
 
 ---
 
+## How far to trust it
+
+FIRMS publishes no map of how much its detections can be trusted.
+`firms_client.reliability` makes one from outside, declared as an
+estimate, and answers two different questions.
+
+**No detection here: was there no fire?** Not necessarily. On 10,290 EFFIS
+burnt areas in Italy (mapped from satellite images of the burnt land, not
+from FIRMS), the share with at least one VIIRS S-NPP detection inside:
+
+| Burnt area | 2016-2021 | 2022-2025 |
+|---|---|---|
+| under 30 ha | 35 % | 19 % |
+| 30 to 100 ha | 70 % | 54 % |
+| 100 to 300 ha | 83 % | 70 % |
+| 300 to 1,000 ha | 92 % | 82 % |
+| 1,000 ha or more | 98 % | 96 % |
+
+```python
+from firms_client import seen
+
+seen(50).describe()
+# 'In Italy, 2022-2025, viirs-snpp saw 54% of the fires of 30 to 100 ha
+#  (704 of 1298 EFFIS burnt areas): no detection is not no fire.'
+```
+
+The share fell after 2021 at every size, and we do not know why: EFFIS
+maps many more small fires since about 2020, but that changes the mix, not
+the share within one size. The table ships with the package
+(`data/detection.json`, with its source); `tools/build_detection.py` builds
+it again. It is VIIRS S-NPP alone, the only VIIRS with country archives:
+the near-real-time feed adds NOAA-20 and NOAA-21 and sees more.
+
+**A detection here: is it a vegetation fire?** `trust()` scores a place from
+the parts it knows, and says why:
+
+```python
+from firms_client import WorldCover, fetch_static_mask, trust
+
+mask = await fetch_static_mask(client, "Italy")
+with WorldCover.synced() as land:
+    trust(40.515, 17.195, mask=mask, land=land)
+# score 0.0: static land source, 545 fire-days over 14 years in the archives;
+#            built-up or bare ground 87%: hot surfaces and industry look like fires
+```
+
+* `static`: 0 in a cell the static mask learnt (industry, flares, volcanoes);
+* `land`: WorldCover around the place, by the rules of `classify_burning`:
+  natural vegetation or cropland 1; a mix of cropland and grassland 0.3,
+  where crop burning and wildfire cannot be told apart (three of four fires
+  on agricultural land came out `mixed` in the benchmark); built-up or bare
+  ground 0.2; mostly water or snow 0.
+
+The score is the lowest part known, reliable from 0.5. With no part known
+it is `None`, **not measured**: never 0, never 1. From a shell:
+`firms trust 40.515 17.195 --country Italy --area-ha 50`.
+
+What it cannot see: clouds and smoke on a given day (FIRMS has no cloud
+mask), why a field burnt, other countries (the table is Italy's).
+
+---
+
 ## Known cases: what the library gets right, and what it does not
 
-Twenty-three checks on places and seasons where a source independent of
+Thirty-one checks on places and seasons where a source independent of
 FIRMS says what happened: two wildfires (Montiferru 2021, Palermo 2023), a
 steelworks (Taranto), a lava flow (Etna, February 2025), the open sea, the
 two worst Italian seasons in the archives (2017 and 2021, by EFFIS), and ten
 burnt areas of the EFFIS database whose land was at least 90 % agricultural
-or 90 % natural. The expected ranges come from each source, never from
-FIRMS; a check that fails stays in the table.
+or 90 % natural; on eight of them, `trust()` too. The expected ranges come
+from each source, never from FIRMS; a check that fails stays in the table.
 
 | Case | Check | Expected | Measured | |
 |---|---|---|---|---|
@@ -731,10 +819,13 @@ FIRMS; a check that fails stays in the table.
 | palermo | many separate fires around the city | events ≥ 5 | 32 | ✅ |
 | taranto | with the archive's type: almost nothing kept | share kept ≤ 0.05 | 0.034 | ✅ |
 | taranto | type hidden, as in the area API: the mask drops it | share kept ≤ 0.05 | 0 | ✅ |
+| taranto | a detection on the steelworks is not a fire | score ≤ 0.49 | 0 | ✅ |
 | etna | with the archive's type: no vegetation fire | share kept ≤ 0.05 | 0.436 | ❌ |
 | etna | type hidden, with the mask: no vegetation fire | share kept ≤ 0.05 | 0.149 | ❌ |
+| etna | a detection on the 2025 lava flow is not a fire | score ≤ 0.49 | 0 | ✅ |
 | tirreno | no fire found | fires ≤ 0 | 0 | ✅ |
 | tirreno | and says that it cannot prove there was none | presence_only ≥ 1 | 1 | ✅ |
+| tirreno | with no mask and no land cover: not measured | not measured | not measured | ✅ |
 | season-2021 | among the three worst years of 2012-2025 | rank ≤ 3 | 3 | ✅ |
 | season-2017 | among the three worst years of 2012-2025 | rank ≤ 3 | 1 | ✅ |
 | sindia-2021 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 59%, natural vegetation 41% | ❌ |
@@ -743,12 +834,17 @@ FIRMS; a check that fails stays in the table.
 | aragona-2024 | classified as a fire on cropland | crop_burning or cropland_fire | mixed: cropland 62%, natural vegetation 38% | ❌ |
 | irsina-2025 | classified as a fire on cropland | crop_burning or cropland_fire | cropland_fire: cropland 88%, natural vegetation 12%, 21 hotspots over 1 day | ✅ |
 | san-luca-2021 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
+| san-luca-2021 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
 | piazza-armerina-2022 | classified as a wildfire | wildfire | wildfire: natural vegetation 99% | ✅ |
+| piazza-armerina-2022 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
 | palermo-2023 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
+| palermo-2023 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
 | monte-verna-2024 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
+| monte-verna-2024 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
 | san-giovanni-rotondo-2025 | classified as a wildfire | wildfire | wildfire: natural vegetation 100% | ✅ |
+| san-giovanni-rotondo-2025 | natural land: a detection here can be read as a fire | score ≥ 0.5 | 1 | ✅ |
 
-**17 of 23** checks pass.
+**25 of 31** checks pass.
 
 What the failures say:
 
@@ -770,6 +866,11 @@ What the failures say:
   see: the answer is «not measured», and it counts as a failure, not as
   «no fire».
 
+`trust()` scores the Etna lava flow 0, as it should, but for a reason that
+is itself wrong: the static mask learnt that cell as offshore (FIRMS
+`type` 3, 4 fire-days in 2 years). FIRMS types some detections on the
+flanks of Etna as offshore platforms.
+
 Taranto's steelworks is dropped with the archive's `type`, and with the
 type hidden, as in the area API, the mask drops it too, and with it the 30
 detections FIRMS typed as vegetation inside the same box: the mask cannot
@@ -782,9 +883,9 @@ What is not there yet:
   stubble burning or an accident, and it maps only fires of about 30 ha and
   more; small stubble fires have no open truth we know of (municipal fire
   cadastres record woods and pastures, not arable land);
-- **how much to trust a place**: the missed fires above are the first data
-  for it; it comes with the reliability estimate
-  ([#26](https://github.com/agent-engineering-studio/firms-client/issues/26), phase 2);
+- **trust on agricultural land**: `trust()` is checked where the sources say
+  what to expect (a steelworks, lava, the sea, natural land); on cropland
+  the expectation would come from the failures above, so it is not scored;
 - **MODIS and the near-real-time area API**: every case is a VIIRS S-NPP
   archive; the area API is checked live in phase 3.
 

@@ -27,6 +27,11 @@
 #            caveats say that no detection does not mean no fire).
 #   season   anomaly() of a year's vegetation-fire detections against the
 #            other years of yearly.json: stat = "rank" (1 = the most).
+#   reliable reliability.trust at lon/lat (or, for an EFFIS case, the middle
+#            of the detections inside the perimeter), with the case's mask
+#            and WorldCover crop when it has them: its score, 0 to 1
+#            (reliable from 0.5). Static sources, lava and water must score
+#            below, natural land above; with nothing known, not measured.
 
 [[case]]
 id = "montiferru"
@@ -108,6 +113,13 @@ Europe, runs blast furnaces and coke ovens all year: a static land source, FIRMS
   hide_type = true
   max = 0.05
 
+  [[case.check]]
+  kind = "reliable"
+  name = "a detection on the steelworks is not a fire"
+  lon = 17.195
+  lat = 40.515
+  max = 0.49
+
 [[case]]
 id = "etna"
 title = "Etna, February 2025: a lava flow on bare rock"
@@ -135,6 +147,13 @@ and, in February, snow: nothing in the box is a vegetation fire. See issue #15."
   hide_type = true
   max = 0.05
 
+  [[case.check]]
+  kind = "reliable"
+  name = "a detection on the 2025 lava flow is not a fire"
+  lon = 14.96
+  lat = 37.73
+  max = 0.49
+
 [[case]]
 id = "tirreno"
 title = "The Tyrrhenian Sea, July 2021: nothing to see"
@@ -158,6 +177,13 @@ detection does not mean no fire, not that the place is safe."""
   name = "and says that it cannot prove there was none"
   stat = "presence_only"
   min = 1
+
+  [[case.check]]
+  kind = "reliable"
+  name = "with no mask and no land cover: not measured"
+  lon = 11.0
+  lat = 40.0
+  none = true
 
 [[case]]
 id = "season-2021"
@@ -322,6 +348,11 @@ source = """EFFIS burnt-area database, perimeter 52111: 850 ha from 2021-08-07 t
   kinds = ["wildfire"]
   min = 1
 
+  [[case.check]]
+  kind = "reliable"
+  name = "natural land: a detection here can be read as a fire"
+  min = 0.5
+
 [[case]]
 id = "piazza-armerina-2022"
 title = "Piazza Armerina, Sicily, 2-6 July 2022: 1034 ha, 92 % natural"
@@ -339,6 +370,11 @@ source = """EFFIS burnt-area database, perimeter 204496: 1034 ha from 2022-07-02
   name = "classified as a wildfire"
   kinds = ["wildfire"]
   min = 1
+
+  [[case.check]]
+  kind = "reliable"
+  name = "natural land: a detection here can be read as a fire"
+  min = 0.5
 
 [[case]]
 id = "palermo-2023"
@@ -358,6 +394,11 @@ source = """EFFIS burnt-area database, perimeter 217929: 1663 ha from 2023-07-27
   kinds = ["wildfire"]
   min = 1
 
+  [[case.check]]
+  kind = "reliable"
+  name = "natural land: a detection here can be read as a fire"
+  min = 0.5
+
 [[case]]
 id = "monte-verna-2024"
 title = "Piana di Monte Verna, Campania, 11-12 August 2024: 542 ha, 99 % natural"
@@ -376,6 +417,11 @@ source = """EFFIS burnt-area database, perimeter 237683: 542 ha from 2024-08-11 
   kinds = ["wildfire"]
   min = 1
 
+  [[case.check]]
+  kind = "reliable"
+  name = "natural land: a detection here can be read as a fire"
+  min = 0.5
+
 [[case]]
 id = "san-giovanni-rotondo-2025"
 title = "San Giovanni Rotondo, Gargano, 21-24 July 2025: 1173 ha, 100 % natural"
@@ -393,3 +439,8 @@ source = """EFFIS burnt-area database, perimeter 275990: 1173 ha from 2025-07-21
   name = "classified as a wildfire"
   kinds = ["wildfire"]
   min = 1
+
+  [[case.check]]
+  kind = "reliable"
+  name = "natural land: a detection here can be read as a fire"
+  min = 0.5

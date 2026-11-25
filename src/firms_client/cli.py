@@ -5,6 +5,8 @@
     firms area --bbox 6,36,19,47.6 --source VIIRS_SNPP_SP --from 2025-07-01 --to 2025-07-31
     firms area --bbox 14.9,37.6,15.3,37.9 --days 2 --mask Italy --fires
     firms anomaly Italy 2025 --month 7
+    firms sync Italy --worldcover 16.4,40.5,16.8,40.8     # once, before a server starts
+    firms trust 40.51 17.20 --country Italy               # a detection here: a fire?
 
 Results go to stdout (``--format summary``, ``json`` for the
 :func:`~firms_client.summarize` digest, ``csv`` or ``geojson``),
@@ -33,6 +35,7 @@ from firms_client.errors import FirmsError
 from firms_client.export import to_csv, to_geojson
 from firms_client.hotspots import Hotspot, select
 from firms_client.mask import fetch_static_mask
+from firms_client.reliability import Reliability, seen, trust
 from firms_client.retry import RetryPolicy
 from firms_client.sources import (
     ARCHIVE_PRODUCTS,
@@ -42,6 +45,7 @@ from firms_client.sources import (
     BBox,
 )
 from firms_client.summary import summarize
+from firms_client.sync import sync
 
 #: The environment variable ``firms area`` reads the MAP_KEY from.
 ENV_MAP_KEY = "FIRMS_MAP_KEY"
@@ -123,6 +127,29 @@ def _parser() -> argparse.ArgumentParser:
     anomaly_.add_argument("--product", choices=sorted(_PRODUCTS), default="viirs-snpp")
     anomaly_.add_argument("--first-year", type=int)
     anomaly_.add_argument("--format", choices=("summary", "json"), default="summary", dest="fmt")
+
+    sync_ = commands.add_parser(
+        "sync", help="download archives, mask and land cover now, for a server or offline use"
+    )
+    sync_.add_argument("country")
+    sync_.add_argument("--product", choices=(*sorted(_PRODUCTS), "all"), default="viirs-snpp")
+    sync_.add_argument("--first-year", type=int)
+    sync_.add_argument(
+        "--worldcover", type=_bbox, metavar="W,S,E,N", help="copy WorldCover over this box"
+    )
+    sync_.add_argument("--dir", type=Path, help="data directory (default: FIRMS_DATA_DIR)")
+
+    trust_ = commands.add_parser(
+        "trust", help="how far a detection at a place can be read as a vegetation fire"
+    )
+    trust_.add_argument("latitude", type=float)
+    trust_.add_argument("longitude", type=float)
+    trust_.add_argument("--country", help="use that country's static-source mask")
+    trust_.add_argument(
+        "--no-land", action="store_true", help="skip the land cover (no landcover extra)"
+    )
+    trust_.add_argument("--area-ha", type=float, help="also: how often FIRMS sees a fire this big")
+    trust_.add_argument("--format", choices=("summary", "json"), default="summary", dest="fmt")
     return parser
 
 
@@ -161,6 +188,60 @@ async def _anomaly(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
     )
     spread = f"median {found.median:,.0f}, percentile {found.percentile:.0f}"
     return f"{found.describe()}\n{spread}\n{years}\n"
+
+
+async def _sync(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
+    products = tuple(_PRODUCTS.values()) if args.product == "all" else (_PRODUCTS[args.product],)
+    report = await sync(
+        client,
+        args.country,
+        products=products,
+        first_year=args.first_year,
+        worldcover=args.worldcover,
+        directory=args.dir,
+        retry=RetryPolicy(),
+    )
+    lines = [f"data directory: {report.directory}"]
+    for slug, years in report.archives.items():
+        lines.append(f"{slug}: {len(years)} archives, {min(years)}-{max(years)}")
+    for slug, years in report.missing.items():
+        lines.append(f"{slug}: not published for {', '.join(map(str, years))}")
+    if report.mask:
+        lines.append(f"static mask: {report.mask_cells} static cells, {report.mask}")
+    if report.worldcover:
+        lines.append(f"WorldCover: {len(report.worldcover)} files over {report.worldcover_bbox}")
+    return "\n".join(lines) + "\n"
+
+
+async def _trust(args: argparse.Namespace, client: httpx.AsyncClient) -> str:
+    mask = None
+    if args.country:
+        mask = await fetch_static_mask(client, args.country, retry=RetryPolicy())
+
+    def place() -> Reliability:
+        if args.no_land:
+            return trust(args.latitude, args.longitude, mask=mask)
+        from firms_client.landcover import WorldCover
+
+        with WorldCover.synced() as land:
+            return trust(args.latitude, args.longitude, mask=mask, land=land)
+
+    found = await asyncio.to_thread(place)
+    rate = seen(args.area_ha) if args.area_ha is not None else None
+    if args.fmt == "json":
+        payload = found.as_dict()
+        if rate is not None:
+            payload["seen"] = {"share": round(rate.share, 3), "describe": rate.describe()}
+        return json.dumps(payload, indent=2) + "\n"
+    score = "not measured" if found.score is None else f"{found.score:g}"
+    verdict = "reliable" if found.reliable else "not reliable"
+    lines = [f"score {score}: {verdict}", *(f"  {r}" for r in found.reasons)]
+    if found.land_cover:
+        cover = ", ".join(f"{k} {100 * v:.0f}%" for k, v in found.land_cover.items())
+        lines.append(f"land cover: {cover}")
+    if rate is not None:
+        lines.append(rate.describe())
+    return "\n".join(lines) + "\n"
 
 
 async def _rows(args: argparse.Namespace, client: httpx.AsyncClient) -> list[Hotspot]:
@@ -203,6 +284,10 @@ def main(
         async with httpx.AsyncClient(timeout=120, transport=transport) as client:
             if args.command == "anomaly":
                 return await _anomaly(args, client)
+            if args.command == "sync":
+                return await _sync(args, client)
+            if args.command == "trust":
+                return await _trust(args, client)
             return _render(args, await _rows(args, client))
 
     try:
