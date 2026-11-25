@@ -15,12 +15,15 @@ from firms_client.bulletin import (
 )
 from firms_client.client import (
     ENV_DATA_DIR,
+    ENV_MAP_KEY,
     default_directory,
     download_archive,
+    env_file_value,
     fetch_archive,
     fetch_archive_csv,
     fetch_area,
     fetch_area_range,
+    map_key_from_env,
 )
 from firms_client.errors import FirmsError
 from firms_client.events import FireEvent, cluster, distance_m
@@ -57,6 +60,15 @@ from firms_client.mask import (
 )
 from firms_client.reliability import RELIABLE_FROM, Reliability, Seen, seen, trust
 from firms_client.retry import RetryPolicy
+from firms_client.service import (
+    MissingDays,
+    check_columns,
+    data_availability,
+    is_map_key,
+    latest_archive,
+    map_key_status,
+    missing_days,
+)
 from firms_client.sources import (
     ARCHIVE_PRODUCTS,
     MAX_AREA_DAYS,
@@ -83,6 +95,7 @@ __all__ = [
     "ATTRIBUTION",
     "CSV_COLUMNS",
     "ENV_DATA_DIR",
+    "ENV_MAP_KEY",
     "MAX_AREA_DAYS",
     "MODIS",
     "NRT_SOURCES",
@@ -108,6 +121,7 @@ __all__ = [
     "FirmsError",
     "Hotspot",
     "MaskRules",
+    "MissingDays",
     "Place",
     "Reliability",
     "RetryPolicy",
@@ -124,14 +138,17 @@ __all__ = [
     "area_windows",
     "build_static_mask",
     "bulletin_facts",
+    "check_columns",
     "check_grounding",
     "classify_burning",
     "cluster",
     "confidence_level",
+    "data_availability",
     "default_directory",
     "distance_m",
     "download_archive",
     "draft_bulletin",
+    "env_file_value",
     "event_land_cover",
     "fetch_archive",
     "fetch_archive_csv",
@@ -139,7 +156,12 @@ __all__ = [
     "fetch_area_range",
     "fetch_static_mask",
     "is_hotspot_csv",
+    "is_map_key",
     "land_kind",
+    "latest_archive",
+    "map_key_from_env",
+    "map_key_status",
+    "missing_days",
     "nearest_places",
     "parse_csv",
     "save_worldcover",

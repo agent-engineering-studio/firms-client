@@ -33,7 +33,14 @@ import httpx
 
 from firms_client import __version__
 from firms_client.anomaly import season_anomaly
-from firms_client.client import default_directory, fetch_archive, fetch_area, fetch_area_range
+from firms_client.client import (
+    ENV_MAP_KEY,
+    default_directory,
+    fetch_archive,
+    fetch_area,
+    fetch_area_range,
+    map_key_from_env,
+)
 from firms_client.errors import FirmsError
 from firms_client.export import to_geojson
 from firms_client.hotspots import Hotspot, select, within
@@ -46,7 +53,6 @@ if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
 
 #: Where the MAP_KEY comes from.
-ENV_MAP_KEY = "FIRMS_MAP_KEY"
 #: Where GeoJSON exports may be written.
 ENV_EXPORT_DIR = "FIRMS_EXPORT_DIR"
 
@@ -318,7 +324,7 @@ def _radius(product: str) -> float:
 
 
 def _map_key() -> str:
-    key = os.environ.get(ENV_MAP_KEY, "").strip()
+    key = map_key_from_env()
     if not key:
         raise FirmsError(
             f"the area API needs a MAP_KEY: set {ENV_MAP_KEY} in the server's environment "

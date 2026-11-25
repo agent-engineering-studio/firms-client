@@ -12,7 +12,7 @@ from typing import Any
 import httpx
 import pytest
 
-from firms_client import ENV_DATA_DIR, FirmsError
+from firms_client import ENV_DATA_DIR, ENV_MAP_KEY, FirmsError
 from firms_client import mcp_server as m
 from firms_client import retry as retry_module
 
@@ -48,7 +48,7 @@ def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 
     monkeypatch.setattr(retry_module, "_sleep", sleep)
     monkeypatch.setenv(ENV_DATA_DIR, str(tmp_path))
-    monkeypatch.delenv(m.ENV_MAP_KEY, raising=False)
+    monkeypatch.delenv(ENV_MAP_KEY, raising=False)
     monkeypatch.delenv(m.ENV_EXPORT_DIR, raising=False)
     CALLS.clear()
     return tmp_path
@@ -188,7 +188,7 @@ def test_tools_answer_with_structured_digests(monkeypatch: pytest.MonkeyPatch) -
         server, "export_geojson", {"country": "Italy", "year": 2025, "filename": "x.geojson"}
     )
     assert export.structured_content["features"] > 0
-    monkeypatch.setenv(m.ENV_MAP_KEY, "KEY")
+    monkeypatch.setenv(ENV_MAP_KEY, "KEY")
     area = call(server, "area_digest", {"bbox": NORTH, "days": 1})
     assert area.structured_content["detections"] == 24
 

@@ -3,6 +3,7 @@
   "product": "viirs-snpp",
   "rule": "at least one select()-ed detection inside the perimeter, from the day before its first date to the day after its last",
   "truth": "EFFIS burnt-area database, https://maps.effis.emergency.copernicus.eu/effis ms:modis.ba.poly, \u00a9 European Union, CC BY 4.0",
+  "excluded": "perimeters whose window holds a day with no VIIRS S-NPP data in FIRMS (no_data): not observed, neither seen nor missed",
   "built_on": "2026-11-25",
   "skipped_geometries": 1,
   "classes": [
@@ -12,11 +13,13 @@
       "periods": {
         "2016-2021": {
           "perimeters": 1537,
-          "seen": 536
+          "seen": 536,
+          "no_data": 0
         },
         "2022-2025": {
-          "perimeters": 4204,
-          "seen": 784
+          "perimeters": 3959,
+          "seen": 777,
+          "no_data": 245
         }
       }
     },
@@ -26,11 +29,13 @@
       "periods": {
         "2016-2021": {
           "perimeters": 1525,
-          "seen": 1068
+          "seen": 1068,
+          "no_data": 0
         },
         "2022-2025": {
-          "perimeters": 1298,
-          "seen": 704
+          "perimeters": 1203,
+          "seen": 696,
+          "no_data": 95
         }
       }
     },
@@ -40,11 +45,13 @@
       "periods": {
         "2016-2021": {
           "perimeters": 755,
-          "seen": 626
+          "seen": 626,
+          "no_data": 0
         },
         "2022-2025": {
-          "perimeters": 520,
-          "seen": 365
+          "perimeters": 471,
+          "seen": 356,
+          "no_data": 49
         }
       }
     },
@@ -54,11 +61,13 @@
       "periods": {
         "2016-2021": {
           "perimeters": 214,
-          "seen": 197
+          "seen": 197,
+          "no_data": 0
         },
         "2022-2025": {
-          "perimeters": 163,
-          "seen": 133
+          "perimeters": 152,
+          "seen": 132,
+          "no_data": 11
         }
       }
     },
@@ -68,11 +77,13 @@
       "periods": {
         "2016-2021": {
           "perimeters": 46,
-          "seen": 45
+          "seen": 45,
+          "no_data": 0
         },
         "2022-2025": {
-          "perimeters": 28,
-          "seen": 27
+          "perimeters": 27,
+          "seen": 26,
+          "no_data": 1
         }
       }
     }

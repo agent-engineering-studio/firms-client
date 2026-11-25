@@ -40,11 +40,20 @@ Key facts an assistant must get right:
 ## How far to trust it, and filling the data directory first
 
 - `trust(latitude, longitude, *, mask=None, land=None, radius_m=500)` -> `Reliability`: how far a detection at a place can be read as a vegetation fire. Parts: `static` (0 in a static cell of the mask, else 1) and `land` (WorldCover around the place, by the rules of `classify_burning`: natural or cropland 1, a cropland-grassland mix 0.3, built-up or bare 0.2, mostly water or snow 0). `score` is the minimum of the known parts, `reliable` is `score >= RELIABLE_FROM` (0.5), `reasons` say why. With no part known, `score` is `None`: **not measured**, never 0 or 1.
-- `seen(area_ha, *, period="2022-2025")` -> `Seen` (`share`, `seen`, `perimeters`, `describe()`): how often VIIRS S-NPP saw a fire of that size, measured on EFFIS burnt areas of Italy (`data/detection.json`, built by `tools/build_detection.py`). 2022-2025: 19% under 30 ha, 54% at 30-100 ha, 70% at 100-300, 82% at 300-1000, 96% from 1000 ha. **No detection is not no fire.** Also `period="2016-2021"`; only Italy.
+- `seen(area_ha, *, period="2022-2025")` -> `Seen` (`share`, `seen`, `perimeters`, `describe()`): how often VIIRS S-NPP saw a fire of that size, measured on EFFIS burnt areas of Italy (`data/detection.json`, built by `tools/build_detection.py`). 2022-2025: 20% under 30 ha, 58% at 30-100 ha, 76% at 100-300, 87% at 300-1000, 96% from 1000 ha; fires on days with no S-NPP data are left out (`no_data`). **No detection is not no fire.** Also `period="2016-2021"`; only Italy.
 - `land_kind(shares, rules=None)` -> `("natural" | "cropland" | "artificial" | "mixed", reason)`: the land rule `classify_burning` and `trust` share.
 - `sync(client, country, *, products=(VIIRS_SNPP,), first_year=None, last_year=None, worldcover=None, directory=None, retry=None)` -> `SyncReport`: download now what the library reads lazily (archives, the static mask, a local WorldCover copy over a box), and write `sync.json`; running it again costs nothing. For servers and offline use. CLI: `firms sync Italy --worldcover W,S,E,N`.
 - `save_worldcover(bbox, directory=None)` -> files: a local copy of WorldCover over a box, under the tiles' names; `WorldCover.synced()` reads it, else the public bucket.
 - CLI: `firms trust LAT LON [--country Italy] [--no-land] [--area-ha N] [--format json]`.
+
+## What the service has, lacks, and the key
+
+- One data directory: `FIRMS_DATA_DIR` from the environment, else from the `.env` of the current directory, else `~/.cache/firms-client`. Archives, the static mask, the WorldCover copy and `sync.json` all go there and are read from there (`default_directory()`). The MAP_KEY likewise: `FIRMS_MAP_KEY` from the environment or `.env` (`map_key_from_env()`, `ENV_MAP_KEY`); `env_file_value(name)` reads one `.env` value without changing the environment.
+- `missing_days(client)` -> `MissingDays` (`standard`, `near_real_time`: `{satellite: frozenset[date]}`; `.missing("VIIRS_SNPP", day, nrt=False)`): the days a satellite has **no data** in FIRMS, from the service's missing-data table (not a documented API: a changed page raises `FirmsError`). A fire on such a day is not measured, not absent. VIIRS S-NPP: no standard data 27 July-10 August 2022, stretches of 2024 and 2026.
+- `latest_archive(client, product, country, *, until=None)` -> the last year with a published country archive, or `None`.
+- `map_key_status(client, key)` (JSON as FIRMS writes it) and `data_availability(client, key, source="ALL")` (CSV rows as written): need a MAP_KEY. `is_map_key(key)`: 32 lowercase letters and digits.
+- `check_columns(header)` -> `{"missing": [...], "unknown": [...]}`: a CSV header against the columns the library reads.
+- CLI: `firms status Italy [--days 30] [--key …] [--format json]`.
 
 ## The rest of the public API
 

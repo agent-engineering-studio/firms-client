@@ -4,9 +4,11 @@ The truth is the EFFIS burnt-area database (layer ``modis.ba.poly``, CC BY 4.0,
 © European Union): perimeters mapped from satellite images of the burnt
 area, not from FIRMS. A perimeter is *seen* when at least one ``select()``-ed
 VIIRS S-NPP detection of the country archive falls inside it, from the day
-before its first date to the day after its last. The share of perimeters
-seen, by size and by period, is what :func:`firms_client.reliability.seen`
-answers with.
+before its first date to the day after its last. A perimeter whose window
+holds a day with no S-NPP data in FIRMS (:func:`firms_client.missing_days`)
+is not counted: nothing was observed then, so it is neither seen nor missed
+(``no_data`` in the table). The share of perimeters seen, by size and by
+period, is what :func:`firms_client.reliability.seen` answers with.
 
 It downloads the country's archives (into the data directory, as the
 library does) and the country's perimeters (about 120 MB for Italy, kept in
@@ -28,7 +30,15 @@ from typing import Any
 
 import httpx
 
-from firms_client import VIIRS_SNPP, Hotspot, RetryPolicy, default_directory, fetch_archive, select
+from firms_client import (
+    VIIRS_SNPP,
+    Hotspot,
+    RetryPolicy,
+    default_directory,
+    fetch_archive,
+    missing_days,
+    select,
+)
 
 OUT = Path(__file__).parents[1] / "src" / "firms_client" / "data" / "detection.json"
 EFFIS_WFS = "https://maps.effis.emergency.copernicus.eu/effis"
@@ -92,6 +102,7 @@ async def main(country: str, iso: str) -> None:
     first, last = PERIODS[0][0], PERIODS[-1][1]
     async with httpx.AsyncClient(timeout=600) as client:
         features = await perimeters(client, country, folder)
+        gaps = (await missing_days(client, retry=RetryPolicy())).standard.get("VIIRS_SNPP", set())
         index: dict[tuple[int, int], list[Hotspot]] = defaultdict(list)
         for year in range(first, last + 1):
             rows = await fetch_archive(client, VIIRS_SNPP, year, country, retry=RetryPolicy())
@@ -99,6 +110,7 @@ async def main(country: str, iso: str) -> None:
                 index[int(h.latitude * 10), int(h.longitude * 10)].append(h)
 
     counts: dict[tuple[int, str], list[int]] = defaultdict(lambda: [0, 0])
+    no_data: dict[tuple[int, str], int] = defaultdict(int)
     skipped = 0
     for f in features:
         p = f["properties"]
@@ -111,6 +123,12 @@ async def main(country: str, iso: str) -> None:
             continue
         start = date.fromisoformat(p["FIREDATE"][:10]) - timedelta(days=1)
         end = date.fromisoformat((p.get("FINALDATE") or p["FIREDATE"])[:10]) + timedelta(days=1)
+        period = next(f"{a}-{b}" for a, b in PERIODS if a <= year <= b)
+        key = (size_class(float(p["AREA_HA"] or 0)), period)
+        days = (start + timedelta(days=n) for n in range((end - start).days + 1))
+        if any(d in gaps for d in days):
+            no_data[key] += 1
+            continue
         xs, ys = zip(*((x, y) for x, y, *_ in _points(geometry)), strict=True)
         near = (
             h
@@ -121,8 +139,6 @@ async def main(country: str, iso: str) -> None:
         seen = any(
             start <= h.acq_date <= end and inside(h.longitude, h.latitude, geometry) for h in near
         )
-        period = next(f"{a}-{b}" for a, b in PERIODS if a <= year <= b)
-        key = (size_class(float(p["AREA_HA"] or 0)), period)
         counts[key][0] += 1
         counts[key][1] += seen
 
@@ -130,7 +146,10 @@ async def main(country: str, iso: str) -> None:
     for i, edge in enumerate(EDGES):
         upper = EDGES[i + 1] if i + 1 < len(EDGES) else None
         periods = {
-            f"{a}-{b}": dict(zip(("perimeters", "seen"), counts[i, f"{a}-{b}"], strict=True))
+            f"{a}-{b}": {
+                **dict(zip(("perimeters", "seen"), counts[i, f"{a}-{b}"], strict=True)),
+                "no_data": no_data[i, f"{a}-{b}"],
+            }
             for a, b in PERIODS
         }
         classes.append({"from_ha": edge, "to_ha": upper, "periods": periods})
@@ -141,6 +160,8 @@ async def main(country: str, iso: str) -> None:
         "before its first date to the day after its last",
         "truth": f"EFFIS burnt-area database, {EFFIS_WFS} {EFFIS_LAYER}, "
         "© European Union, CC BY 4.0",
+        "excluded": "perimeters whose window holds a day with no VIIRS S-NPP data in FIRMS "
+        "(no_data): not observed, neither seen nor missed",
         "built_on": datetime.now(UTC).date().isoformat(),
         "skipped_geometries": skipped,
         "classes": classes,

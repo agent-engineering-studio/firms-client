@@ -42,3 +42,10 @@ def test_area_windows_run_forward_in_steps_of_five() -> None:
     assert area_windows(date(2024, 12, 30), date(2025, 1, 2)) == [(date(2024, 12, 30), 4)]
     with pytest.raises(ValueError, match="before"):
         area_windows(date(2025, 7, 2), date(2025, 7, 1))
+
+
+def test_area_url_on_another_base() -> None:
+    from firms_client import area_url
+
+    url = area_url("K", "VIIRS_SNPP_NRT", (6, 36, 19, 47.6), base="http://proxy.local/csv/")
+    assert url == "http://proxy.local/csv/K/VIIRS_SNPP_NRT/6,36,19,47.6/1"

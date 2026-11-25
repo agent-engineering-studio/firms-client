@@ -73,17 +73,24 @@ def archive_years(product: ArchiveProduct, *, until: int) -> list[int]:
 
 
 def area_url(
-    map_key: str, source: str, bbox: BBox, *, days: int = 1, on_date: date | None = None
+    map_key: str,
+    source: str,
+    bbox: BBox,
+    *,
+    days: int = 1,
+    on_date: date | None = None,
+    base: str = AREA_API_BASE,
 ) -> str:
     """The area API URL.
 
     Without ``on_date``, the last ``days`` days up to today; with it, the
-    ``days`` days starting on ``on_date``. ``days`` is 1 to 5.
+    ``days`` days starting on ``on_date``. ``days`` is 1 to 5. ``base`` is the
+    area API's root, for a proxy or a mirror.
     """
     if not 1 <= days <= MAX_AREA_DAYS:
         raise ValueError(f"days must be 1 to {MAX_AREA_DAYS}, got {days}")
     area = ",".join(f"{c:g}" for c in bbox)
-    url = f"{AREA_API_BASE}/{map_key}/{source}/{area}/{days}"
+    url = f"{base.rstrip('/')}/{map_key}/{source}/{area}/{days}"
     return f"{url}/{on_date.isoformat()}" if on_date is not None else url
 
 

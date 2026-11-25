@@ -37,6 +37,7 @@ One dependency: `httpx`. Website: **[agentengineering.it/firms-client](https://a
 - [Not every hotspot is a fire](#not-every-hotspot-is-a-fire)
 - [How it works](#how-it-works)
 - [Recipes](#recipes)
+- [What the service has, and lacks](#what-the-service-has-and-lacks)
 - [How far to trust it](#how-far-to-trust-it)
 - [Known cases](#known-cases-what-the-library-gets-right-and-what-it-does-not)
 - [The traps we already fell into](#the-traps-we-already-fell-into)
@@ -253,12 +254,20 @@ Sicily compare with 2025?"*: it calls `fire_history` with Sicily's bbox.
 
 ## Where downloads are saved
 
-Yearly archives go to the directory you pass (`directory=` on
-`fetch_archive`, `fetch_archive_csv` and `download_archive`). If you pass
-none:
+Everything the library downloads goes to **one data directory**, and is
+read from there: the yearly archives, the static mask, the WorldCover copy,
+`sync.json`. Pass `directory=` to a function to choose another; otherwise:
 
-1. `FIRMS_DATA_DIR`, if set;
-2. otherwise `~/.cache/firms-client` (or `$XDG_CACHE_HOME/firms-client`).
+1. `FIRMS_DATA_DIR` from the environment;
+2. else `FIRMS_DATA_DIR` from a `.env` file in the current directory;
+3. else `~/.cache/firms-client` (or `$XDG_CACHE_HOME/firms-client`).
+
+The MAP_KEY works the same way (`FIRMS_MAP_KEY`, environment or `.env`).
+`.env.example` lists every setting:
+
+```bash
+cp .env.example .env   # then set FIRMS_DATA_DIR and FIRMS_MAP_KEY
+```
 
 ```
 ~/.cache/firms-client/
@@ -738,6 +747,39 @@ rows = parse_csv(requests.get(url, timeout=120).text)
 
 ---
 
+## What the service has, and lacks
+
+`firms status Italy` says, before you read an empty answer as «no fire»:
+
+* the last year of each country archive (the current year is never there:
+  the area API covers it);
+* the days each satellite has **no data** in FIRMS, from the service's own
+  table: VIIRS S-NPP has none from 27 July to 10 August 2022, in the middle
+  of the fire season, and on stretches of 2024 and 2026. A fire on such a
+  day is not measured, not absent (`missing_days()` in Python);
+* with a MAP_KEY, the transactions left and the first and last date of
+  each source.
+
+`check_columns(header)` compares a CSV header with the columns the library
+reads, and a weekly CI job (`make live`) runs these checks against the real
+service, so a change of contract is a red build, not missing values.
+
+### Getting a MAP_KEY
+
+The archives need no key; the near-real-time area API does. It is free:
+
+1. open https://firms.modaps.eosdis.nasa.gov/api/map_key/ and choose
+   **Get MAP_KEY**;
+2. type your e-mail address: the key (32 lowercase letters and digits)
+   arrives by e-mail;
+3. put it in `.env` as `FIRMS_MAP_KEY=…`, or in the environment, and check
+   it with `firms status Italy`.
+
+It allows 5,000 transactions per 10 minutes. Treat it as a password: never
+in code or in a repository. In CI it is the `FIRMS_MAP_KEY` secret.
+
+---
+
 ## How far to trust it
 
 FIRMS publishes no map of how much its detections can be trusted.
@@ -746,27 +788,30 @@ estimate, and answers two different questions.
 
 **No detection here: was there no fire?** Not necessarily. On 10,290 EFFIS
 burnt areas in Italy (mapped from satellite images of the burnt land, not
-from FIRMS), the share with at least one VIIRS S-NPP detection inside:
+from FIRMS), the share with at least one VIIRS S-NPP detection inside. The
+401 that burnt on days with no S-NPP data in FIRMS are left out: nothing was
+observed then (see `missing_days()` below).
 
 | Burnt area | 2016-2021 | 2022-2025 |
 |---|---|---|
-| under 30 ha | 35 % | 19 % |
-| 30 to 100 ha | 70 % | 54 % |
-| 100 to 300 ha | 83 % | 70 % |
-| 300 to 1,000 ha | 92 % | 82 % |
+| under 30 ha | 35 % | 20 % |
+| 30 to 100 ha | 70 % | 58 % |
+| 100 to 300 ha | 83 % | 76 % |
+| 300 to 1,000 ha | 92 % | 87 % |
 | 1,000 ha or more | 98 % | 96 % |
 
 ```python
 from firms_client import seen
 
 seen(50).describe()
-# 'In Italy, 2022-2025, viirs-snpp saw 54% of the fires of 30 to 100 ha
-#  (704 of 1298 EFFIS burnt areas): no detection is not no fire.'
+# 'In Italy, 2022-2025, viirs-snpp saw 58% of the fires of 30 to 100 ha
+#  (696 of 1203 EFFIS burnt areas): no detection is not no fire.'
 ```
 
-The share fell after 2021 at every size, and we do not know why: EFFIS
-maps many more small fires since about 2020, but that changes the mix, not
-the share within one size. The table ships with the package
+The share fell after 2021 at every size. Part of it is the days with no
+S-NPP data (27 July to 10 August 2022, stretches of summer 2024), now left
+out; the rest we cannot explain. EFFIS maps many more small fires since
+about 2020, but that changes the mix, not the share within one size. The table ships with the package
 (`data/detection.json`, with its source); `tools/build_detection.py` builds
 it again. It is VIIRS S-NPP alone, the only VIIRS with country archives:
 the near-real-time feed adds NOAA-20 and NOAA-21 and sees more.

@@ -10,9 +10,7 @@ All notable changes to this project are documented here. The format follows
 
 - How far to trust FIRMS (`firms_client.reliability`), an estimate declared
   as such. `seen(area_ha)`: how often VIIRS S-NPP saw a fire of that size,
-  measured on 10,290 EFFIS burnt areas of Italy (2022-2025: 19 % under
-  30 ha, 54 % at 30-100, 70 % at 100-300, 82 % at 300-1,000, 96 % from
-  1,000 ha), shipped as `data/detection.json` and built by
+  measured on 10,290 EFFIS burnt areas of Italy, shipped as `data/detection.json` and built by
   `tools/build_detection.py`. `trust(lat, lon, mask=, land=)`: whether a
   detection at a place can be read as a vegetation fire, from the static
   mask and the land cover, with its reasons; with nothing known, not
@@ -25,6 +23,24 @@ All notable changes to this project are documented here. The format follows
   `StaticMask.verdict_at(latitude, longitude)`.
 - Benchmark: eight `trust` checks (steelworks, lava, sea, natural land),
   25 of 31 pass in all.
+
+- The service's contract and freshness (`firms_client.service`):
+  `missing_days()`, the days each satellite has no data in FIRMS, from the
+  service's own table (VIIRS S-NPP: 27 July-10 August 2022, stretches of
+  2024 and 2026); `latest_archive()`; `map_key_status()` and
+  `data_availability()` with a MAP_KEY; `check_columns()`; `is_map_key()`.
+  `firms status COUNTRY`. A weekly live CI job (`make live`), with the
+  `FIRMS_MAP_KEY` secret for the key's checks.
+- One data directory from `.env`: `FIRMS_DATA_DIR` and `FIRMS_MAP_KEY` are
+  read from the environment, else from the `.env` of the current directory
+  (`env_file_value`, `map_key_from_env`). `.env.example` lists every setting.
+- `area_url(..., base=)`: the area API's root, for a proxy or a mirror.
+
+### Changed
+
+- `seen()` leaves out the fires on days with no S-NPP data (401 of 10,290,
+  counted as `no_data`): 2022-2025 shares rise to 58 % at 30-100 ha, 76 % at
+  100-300 and 87 % at 300-1,000.
 
 ### Fixed
 

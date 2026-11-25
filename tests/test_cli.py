@@ -8,7 +8,8 @@ import pytest
 
 from firms_client import ENV_DATA_DIR
 from firms_client import retry as retry_module
-from firms_client.cli import ENV_MAP_KEY, main
+from firms_client.cli import main
+from firms_client.client import ENV_MAP_KEY
 
 FIXTURES = Path(__file__).parent / "fixtures"
 VIIRS = (FIXTURES / "viirs-snpp_2025_Italy_sample.csv").read_bytes()
@@ -243,3 +244,36 @@ def test_trust_command(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.M
         main(["trust", "40.5", "17.2", "--no-land", "--format", "json"], transport=TRANSPORT) == 0
     )
     assert "seen" not in json.loads(capsys.readouterr().out)
+
+
+def status_handler(request: httpx.Request) -> httpx.Response:
+    url = str(request.url)
+    if "missing_data" in url:
+        return httpx.Response(200, content=(FIXTURES / "missing_data.json").read_bytes())
+    if "mapkey_status" in url:
+        return httpx.Response(200, json={"transaction_limit": 5000})
+    if "data_availability" in url:
+        return httpx.Response(200, text="data_id,min_date,max_date\nX,2020-01-01,2026-11-24\n")
+    return handler(request)
+
+
+def test_status_command(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport = httpx.MockTransport(status_handler)
+    monkeypatch.chdir(tmp_path)  # no .env here
+    assert main(["status", "Italy", "--days", "100000"], transport=transport) == 0
+    out = capsys.readouterr().out
+    assert "  viirs-snpp: 2025\n" in out and "  modis: None\n" in out
+    assert "VIIRS_SNPP (standard): 82, 2012-03-25 to 2026-08-05" in out
+    assert "MAP_KEY: not set" in out
+    assert main(["status", "Italy", "--days", "1"], transport=transport) == 0
+    assert "  none\n" in capsys.readouterr().out
+    monkeypatch.setenv(ENV_MAP_KEY, "0123456789abcdef0123456789abcdef")
+    assert main(["status", "Italy", "--format", "json"], transport=transport) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["map_key"] == {"transaction_limit": 5000}
+    assert report["data_availability"][0]["data_id"] == "X"
+    assert main(["status", "Italy"], transport=transport) == 0
+    out = capsys.readouterr().out
+    assert 'MAP_KEY: {"transaction_limit": 5000}' in out and "data_id X" in out
