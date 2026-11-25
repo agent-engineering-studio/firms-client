@@ -71,6 +71,16 @@
       "pass": true
     },
     {
+      "case": "taranto",
+      "status": "static",
+      "check": "a detection on the steelworks is not a fire",
+      "kind": "reliable",
+      "measured": 0.0,
+      "expected": "score ≤ 0.49",
+      "pass": true,
+      "reasons": "static land source: 537 fire-days over 13 years in the archives"
+    },
+    {
       "case": "etna",
       "status": "false-fire",
       "check": "with the archive's type: no vegetation fire",
@@ -89,6 +99,16 @@
       "pass": false
     },
     {
+      "case": "etna",
+      "status": "false-fire",
+      "check": "a detection on the 2025 lava flow is not a fire",
+      "kind": "reliable",
+      "measured": 0.0,
+      "expected": "score ≤ 0.49",
+      "pass": true,
+      "reasons": "offshore: 4 fire-days over 2 years in the archives"
+    },
+    {
       "case": "tirreno",
       "status": "blind",
       "check": "no fire found",
@@ -105,6 +125,16 @@
       "measured": 1.0,
       "expected": "presence_only ≥ 1",
       "pass": true
+    },
+    {
+      "case": "tirreno",
+      "status": "blind",
+      "check": "with no mask and no land cover: not measured",
+      "kind": "reliable",
+      "measured": null,
+      "expected": "not measured",
+      "pass": true,
+      "reasons": "not measured: no static mask and no land cover here"
     },
     {
       "case": "season-2021",
@@ -185,6 +215,16 @@
       "verdict": "wildfire: natural vegetation 100%"
     },
     {
+      "case": "san-luca-2021",
+      "status": "wildland",
+      "check": "natural land: a detection here can be read as a fire",
+      "kind": "reliable",
+      "measured": 1.0,
+      "expected": "score ≥ 0.5",
+      "pass": true,
+      "reasons": "no reason against"
+    },
+    {
       "case": "piazza-armerina-2022",
       "status": "wildland",
       "check": "classified as a wildfire",
@@ -193,6 +233,16 @@
       "expected": "wildfire",
       "pass": true,
       "verdict": "wildfire: natural vegetation 99%"
+    },
+    {
+      "case": "piazza-armerina-2022",
+      "status": "wildland",
+      "check": "natural land: a detection here can be read as a fire",
+      "kind": "reliable",
+      "measured": 1.0,
+      "expected": "score ≥ 0.5",
+      "pass": true,
+      "reasons": "no reason against"
     },
     {
       "case": "palermo-2023",
@@ -205,7 +255,37 @@
       "verdict": "wildfire: natural vegetation 100%"
     },
     {
+      "case": "palermo-2023",
+      "status": "wildland",
+      "check": "natural land: a detection here can be read as a fire",
+      "kind": "reliable",
+      "measured": 1.0,
+      "expected": "score ≥ 0.5",
+      "pass": true,
+      "reasons": "no reason against"
+    },
+    {
       "case": "monte-verna-2024",
+      "status": "wildland",
+      "check": "classified as a wildfire",
+      "kind": "burning",
+      "measured": 1.0,
+      "expected": "wildfire",
+      "pass": true,
+      "verdict": "wildfire: natural vegetation 100%"
+    },
+    {
+      "case": "monte-verna-2024",
+      "status": "wildland",
+      "check": "natural land: a detection here can be read as a fire",
+      "kind": "reliable",
+      "measured": 1.0,
+      "expected": "score ≥ 0.5",
+      "pass": true,
+      "reasons": "no reason against"
+    },
+    {
+      "case": "san-giovanni-rotondo-2025",
       "status": "wildland",
       "check": "classified as a wildfire",
       "kind": "burning",
@@ -217,12 +297,12 @@
     {
       "case": "san-giovanni-rotondo-2025",
       "status": "wildland",
-      "check": "classified as a wildfire",
-      "kind": "burning",
+      "check": "natural land: a detection here can be read as a fire",
+      "kind": "reliable",
       "measured": 1.0,
-      "expected": "wildfire",
+      "expected": "score ≥ 0.5",
       "pass": true,
-      "verdict": "wildfire: natural vegetation 100%"
+      "reasons": "no reason against"
     }
   ]
 }

@@ -187,3 +187,59 @@ def test_anomaly_command(capsys: pytest.CaptureFixture[str]) -> None:
     assert json.loads(capsys.readouterr().out)["of"] == 2
     assert main(["anomaly", "Italy", "2011"], transport=transport) == 1
     assert "no viirs-snpp archive" in capsys.readouterr().err
+
+
+def test_sync_command(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    args = ["sync", "Italy", "--first-year", "2025", "--dir", str(tmp_path)]
+    assert main(args, transport=TRANSPORT) == 0
+    out = capsys.readouterr().out
+    assert f"data directory: {tmp_path}" in out
+    assert "viirs-snpp: 1 archives, 2025-2025" in out and "static mask:" in out
+    assert main([*args[:-2], "--product", "all"], transport=TRANSPORT) == 0
+    out = capsys.readouterr().out
+    assert "modis: not published for 2025" in out
+
+
+def test_sync_command_with_worldcover(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import firms_client.landcover as landcover
+
+    monkeypatch.setattr(landcover, "save_worldcover", lambda bbox, directory: [tmp_path / "a.tif"])
+    args = ["sync", "Italy", "--first-year", "2025", "--worldcover", "17,40,17.5,40.5"]
+    assert main(args, transport=TRANSPORT) == 0
+    assert "WorldCover: 1 files over (17.0, 40.0, 17.5, 40.5)" in capsys.readouterr().out
+
+
+def test_trust_command(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    import firms_client.landcover as landcover
+
+    class Fields:
+        def __enter__(self) -> Fields:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+        def shares(self, latitude: float, longitude: float, radius_m: float) -> dict[int, float]:
+            return {40: 0.6, 30: 0.4}
+
+    monkeypatch.setattr(landcover.WorldCover, "synced", classmethod(lambda cls: Fields()))
+    assert main(["trust", "40.5", "17.2", "--area-ha", "50"], transport=TRANSPORT) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("score 0.3: not reliable\n")
+    assert "cannot be told apart" in out and "land cover: cropland 60%, grassland 40%" in out
+    assert "of the fires of 30 to 100 ha" in out
+
+    assert main(["trust", "40.5", "17.2", "--no-land"], transport=TRANSPORT) == 0
+    assert capsys.readouterr().out.startswith("score not measured: not reliable\n")
+
+    args = ["trust", "40.5", "17.2", "--country", "Italy", "--area-ha", "5", "--format", "json"]
+    assert main(args, transport=TRANSPORT) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["parts"]["static"] in (0.0, 1.0) and payload["parts"]["land"] == 0.3
+    assert payload["seen"]["describe"].startswith("In Italy, 2022-2025")
+    assert (
+        main(["trust", "40.5", "17.2", "--no-land", "--format", "json"], transport=TRANSPORT) == 0
+    )
+    assert "seen" not in json.loads(capsys.readouterr().out)
