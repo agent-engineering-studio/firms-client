@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --locked --all-extras
+      - run: uv sync --locked --all-extras --group demo
       - run: uv run ruff check
       - run: uv run ruff format --check
       - run: uv run mypy
@@ -81,3 +81,42 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: make docs
+
+  # The two notebooks that need no network, on the crops of the benchmark.
+  notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: make notebooks-offline
+
+  # The page of a Comune as a Comune installs it: build, start without a key,
+  # and the API and the page must answer.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # No WorldCover download in CI: the page must answer without it.
+      - run: cp .env.example .env && sed -i 's/^FIRMS_UI_LAND_COVER=1/FIRMS_UI_LAND_COVER=0/' .env
+      - run: docker compose up -d --build api ui
+      - name: The API and the page answer
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose exec -T api python -c "import urllib.request; urllib.request.urlopen('http://localhost:8010/api/health', timeout=4)" \
+              && curl -fsS -o /dev/null http://127.0.0.1:3005/; then
+              break
+            fi
+            sleep 3
+          done
+          docker compose exec -T api python -c "import urllib.request, json; h = json.load(urllib.request.urlopen('http://localhost:8010/api/health')); print(h['map_key'], h['data']['state']); assert h['map_key'] is False"
+          curl -fsS http://127.0.0.1:3005/api/health
+          curl -fsS http://127.0.0.1:3005/ | grep -q "firms-client"
+      - name: Logs
+        if: always()
+        run: docker compose logs --tail=100
+      - run: docker compose down -v
+        if: always()

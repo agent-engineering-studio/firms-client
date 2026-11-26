@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help check lint format typecheck test test-core live build docs bench faithful bench-data clean
+.PHONY: help check lint format typecheck test test-core live build docs bench faithful bench-data notebooks notebooks-offline up demo down logs clean
 
 help: ## List the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -15,10 +15,10 @@ format: ## Format the code and fix what ruff can
 	uv run ruff check --fix
 
 typecheck: ## mypy --strict
-	uv run --all-extras mypy
+	uv run --all-extras --group demo mypy
 
 test: ## pytest with coverage, every extra installed (no key, no network)
-	uv run --all-extras pytest --cov --cov-report=term-missing
+	uv run --all-extras --group demo pytest --cov --cov-report=term-missing
 
 # What most users install. Its own environment, so .venv keeps the extras:
 # the tests of the extras skip, the rest must pass.
@@ -55,6 +55,39 @@ docs: ## The site with the API reference, in _site/
 	cat docs/llms.txt README.md skills/firms-client/SKILL.md > _site/llms-full.txt
 	cp -r docs/images _site/images
 	uv run --all-extras --group docs pdoc firms_client -o _site/api
+
+# The notebooks are stored with their outputs. 01 and 02 download the yearly
+# archives (no key, about 2 MB a year, once); 03 and 04 run on the crops of
+# the benchmark, offline, as CI does.
+notebooks: ## Run every notebook again, outputs saved in place
+	cd notebooks && for nb in *.ipynb; do \
+		echo "== $$nb"; \
+		uv run --all-extras --group examples jupyter nbconvert --to notebook --execute --inplace "$$nb" || exit 1; \
+	done
+
+OFFLINE = 03_how_much_to_trust.ipynb 04_cells_for_a_model.ipynb
+notebooks-offline: ## Run the notebooks that need no network (03, 04), as CI does
+	cd notebooks && for nb in $(OFFLINE); do \
+		echo "== $$nb"; \
+		uv run --all-extras --group examples jupyter nbconvert --to notebook --execute --stdout "$$nb" > /dev/null || exit 1; \
+	done
+
+# Docker: every setting is in .env (cp .env.example .env). Ports on 127.0.0.1 only.
+up: ## The page, the notebooks and the MCP server in Docker (http://127.0.0.1:3005)
+	docker compose --profile notebook --profile mcp up -d --build
+	@echo "page:      http://127.0.0.1:$${FIRMS_UI_PORT:-3005}"
+	@echo "notebooks: http://127.0.0.1:$${FIRMS_NOTEBOOK_PORT:-8890} (token: make logs)"
+	@echo "MCP:       http://127.0.0.1:$${FIRMS_MCP_PORT:-8769}/mcp"
+
+demo: ## Only the page (the API and the UI): no key needed
+	docker compose up -d --build api ui
+	@echo "page: http://127.0.0.1:$${FIRMS_UI_PORT:-3005}"
+
+down: ## Stop the containers (the downloaded archives stay in the volume)
+	docker compose --profile notebook --profile mcp --profile tools down
+
+logs: ## Follow the logs of the containers
+	docker compose --profile notebook --profile mcp logs -f --tail=50
 
 clean: ## Remove what the targets build (downloaded archives stay in the data directory)
 	rm -rf dist _site .venv-core htmlcov .coverage .pytest_cache .mypy_cache .ruff_cache

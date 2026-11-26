@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The page of a Comune, with Docker (`compose.yaml`, `Dockerfile`,
+  `demo/api.py`, `demo/web`): the fires of the last days (with a MAP_KEY) and
+  of each archive year in an area, the largest of them and what land burnt,
+  how far to trust a detection at a point, «Non è un'allerta» always in view.
+  Bootstrap Italia and Leaflet from npm, Italian and English, configured from
+  `.env` and the URL, embeddable in an iframe. Without a key it shows the
+  archives only, and says so. Ports on 127.0.0.1; the MAP_KEY only from
+  `.env` or a mounted file, never in an image, a log or an answer (tested).
+- Containers for the notebooks (JupyterLab, profile `notebook`), the MCP
+  server over HTTP (profile `mcp`) and the command line (profile `tools`).
+- `firms-mcp --http PORT --host HOST`: the MCP server over streamable HTTP.
+- Four notebooks (#21): a national fire history, one season against the
+  others, how much to trust a detection, per-cell features for a model.
+  `make notebooks`; `make notebooks-offline` runs the two that need no
+  network, in CI.
+- CI builds and starts the Docker stack and checks the API and the page.
+- `docs/riuso.md`: installing the page for a Comune.
+
 ## [0.8.0] - 2026-11-26
 
 ### Added

@@ -216,19 +216,20 @@ def test_main_runs_stdio_or_explains_the_extra(
     ran: list[str] = []
 
     class Fake:
-        def run(self, transport: str) -> None:
-            ran.append(transport)
+        def run(self, transport: str, **options: object) -> None:
+            ran.append(f"{transport} {options}" if options else transport)
 
     monkeypatch.setattr(m, "build_server", lambda: Fake())
-    m.main()
-    assert ran == ["stdio"]
+    m.main([])
+    m.main(["--http", "8769", "--host", "0.0.0.0"])
+    assert ran == ["stdio", "streamable-http {'host': '0.0.0.0', 'port': 8769}"]
 
     def missing() -> None:
         raise ModuleNotFoundError("No module named 'mcp'", name="mcp")
 
     monkeypatch.setattr(m, "build_server", missing)
     with pytest.raises(SystemExit):
-        m.main()
+        m.main([])
     assert "firms-client[mcp]" in capsys.readouterr().err
 
     def other() -> None:
@@ -236,7 +237,7 @@ def test_main_runs_stdio_or_explains_the_extra(
 
     monkeypatch.setattr(m, "build_server", other)
     with pytest.raises(ModuleNotFoundError):
-        m.main()
+        m.main([])
 
 
 NRT = "\n".join(line.rsplit(",", 1)[0] for line in VIIRS.decode().splitlines()) + "\n"

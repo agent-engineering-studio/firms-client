@@ -754,8 +754,20 @@ def build_server(transport: httpx.AsyncBaseTransport | None = None) -> MCPServer
     return server
 
 
-def main() -> None:
-    """Run the server over stdio."""
+def main(argv: list[str] | None = None) -> None:
+    """Run the server over stdio, or over HTTP at ``http://host:port/mcp``.
+
+    HTTP is for a container (``firms-mcp --http 8769 --host 0.0.0.0``); the
+    MAP_KEY stays in the server's environment either way.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="firms-mcp", description="NASA FIRMS as MCP tools")
+    parser.add_argument(
+        "--http", type=int, metavar="PORT", help="serve over HTTP at /mcp on this port, not stdio"
+    )
+    parser.add_argument("--host", default="127.0.0.1", help="the address for --http")
+    args = parser.parse_args(argv)
     try:
         server = build_server()
     except ModuleNotFoundError as error:
@@ -763,4 +775,7 @@ def main() -> None:
             raise
         print("firms-mcp needs the mcp extra: pip install 'firms-client[mcp]'", file=sys.stderr)
         raise SystemExit(1) from None
-    server.run("stdio")
+    if args.http is None:
+        server.run("stdio")
+    else:
+        server.run("streamable-http", host=args.host, port=args.http)

@@ -12,3 +12,10 @@ htmlcov/
 _site/
 .env
 /data/
+secrets/
+*.map_key
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.ipynb_checkpoints/

@@ -1,0 +1,100 @@
+# firms-client on this machine, with nothing to install but Docker.
+#
+#   docker compose up                         the page of a Comune: http://127.0.0.1:3005
+#   docker compose --profile notebook up      + the notebooks: http://127.0.0.1:8890
+#   docker compose --profile mcp up           + the MCP server: http://127.0.0.1:8769/mcp
+#   docker compose run --rm cli --help        the command line
+#
+# Every setting is in .env (copy .env.example). The ports listen on 127.0.0.1
+# only: to publish the page, put a proxy with HTTPS in front of it.
+#
+# The MAP_KEY: FIRMS_MAP_KEY in .env, or a file in ./secrets (FIRMS_SECRETS_DIR)
+# mounted read-only. It is never copied into an image. Without a key the page
+# shows the yearly archives only, and says so.
+name: firms-client
+
+x-firms: &firms
+  image: firms-client:local
+  build: .
+  volumes:
+    - ${FIRMS_DATA_VOLUME:-firms-data}:/data
+    - ${FIRMS_SECRETS_DIR:-./secrets}:/run/secrets/firms:ro
+  environment: &env
+    DATA_ROOT: /data
+    FIRMS_MAP_KEY: ${FIRMS_MAP_KEY:-}
+    FIRMS_MAP_KEY_FILE: /run/secrets/firms/${FIRMS_MAP_KEY_NAME:-map_key}
+
+services:
+  # What the page asks: the library behind a few URLs (demo/api.py).
+  api:
+    <<: *firms
+    container_name: firms-client-api
+    environment:
+      <<: *env
+      FIRMS_UI_LAT: ${FIRMS_UI_LAT:-}
+      FIRMS_UI_LON: ${FIRMS_UI_LON:-}
+      FIRMS_UI_RADIUS_KM: ${FIRMS_UI_RADIUS_KM:-}
+      FIRMS_UI_PLACE: ${FIRMS_UI_PLACE:-}
+      FIRMS_UI_COUNTRY: ${FIRMS_UI_COUNTRY:-}
+      FIRMS_UI_NRT_SOURCE: ${FIRMS_UI_NRT_SOURCE:-}
+      FIRMS_UI_LAND_COVER: ${FIRMS_UI_LAND_COVER:-1}
+    restart: unless-stopped
+
+  # The page: a map of the Comune and a panel (demo/web).
+  ui:
+    image: firms-client-ui:local
+    container_name: firms-client-ui
+    build: demo/web
+    environment:
+      FIRMS_UI_API: http://api:8010
+      FIRMS_UI_PLACE: ${FIRMS_UI_PLACE:-}
+      FIRMS_UI_LAT: ${FIRMS_UI_LAT:-}
+      FIRMS_UI_LON: ${FIRMS_UI_LON:-}
+      FIRMS_UI_ZOOM: ${FIRMS_UI_ZOOM:-}
+      FIRMS_UI_LANG: ${FIRMS_UI_LANG:-}
+      FIRMS_UI_FRAME_ANCESTORS: ${FIRMS_UI_FRAME_ANCESTORS:-}
+      FIRMS_UI_TILES: ${FIRMS_UI_TILES:-}
+      FIRMS_UI_TILES_CREDIT: ${FIRMS_UI_TILES_CREDIT:-}
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:${FIRMS_UI_PORT:-3005}:3000"
+    restart: unless-stopped
+
+  # The notebooks, in JupyterLab. The token is FIRMS_NOTEBOOK_TOKEN, or a random
+  # one printed in `docker compose logs notebook`.
+  notebook:
+    <<: *firms
+    container_name: firms-client-notebook
+    profiles: [notebook]
+    environment:
+      <<: *env
+      FIRMS_NOTEBOOK_TOKEN: ${FIRMS_NOTEBOOK_TOKEN:-}
+    entrypoint: ["sh", "/app/demo/notebook.sh"]
+    healthcheck:
+      disable: true
+    ports:
+      - "127.0.0.1:${FIRMS_NOTEBOOK_PORT:-8890}:8890"
+
+  # FIRMS as tools for AI agents, over HTTP (streamable): http://127.0.0.1:8769/mcp
+  mcp:
+    <<: *firms
+    container_name: firms-client-mcp
+    profiles: [mcp]
+    command: ["firms-mcp", "--http", "8769", "--host", "0.0.0.0"]
+    healthcheck:
+      disable: true
+    ports:
+      - "127.0.0.1:${FIRMS_MCP_PORT:-8769}:8769"
+
+  cli:
+    <<: *firms
+    profiles: [tools]
+    entrypoint: ["firms"]
+    healthcheck:
+      disable: true
+
+volumes:
+  # The yearly archives, the static mask and the WorldCover tiles of the area,
+  # kept between one run and the next.
+  firms-data:
