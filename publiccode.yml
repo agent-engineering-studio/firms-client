@@ -41,6 +41,7 @@ description:
       - Riga di comando e server MCP per gli assistenti AI
       - Pagina per il sito del Comune con Bootstrap Italia, installabile con Docker
     screenshots:
+      - docs/images/ui-comune.jpg
       - docs/images/map.png
       - docs/images/types.png
       - docs/images/monthly.png
@@ -70,6 +71,7 @@ description:
       - Command line and an MCP server for AI assistants
       - A page for the Comune's website with Bootstrap Italia, installed with Docker
     screenshots:
+      - docs/images/ui-comune-en.jpg
       - docs/images/map.png
       - docs/images/types.png
       - docs/images/monthly.png

@@ -283,6 +283,10 @@ default) and shows, in Italian or English, with Bootstrap Italia:
 - «Non è un'allerta» / «Not an alert» always in view, the presence-only
   note, and the NASA and ESA credits.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/agent-engineering-studio/firms-client/main/docs/images/ui-comune-en.jpg" alt="The page set on Palermo, 2023 season: the fire of 25-26 July with 84 detections on natural land, a bar per year, and trust 1 at a clicked point" width="100%">
+</p>
+
 At startup the API downloads the archives of the country (Italy: about 2 MB a
 year) and the WorldCover tiles of the area (about 60 MB each), once, into the
 volume `firms-data`. The ports listen on 127.0.0.1 only: publish the page

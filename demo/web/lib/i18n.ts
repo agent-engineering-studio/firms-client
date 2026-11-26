@@ -36,7 +36,7 @@ const it = {
     unknown: "senza tipo",
   } as Record<string, string>,
   largest: "Gli incendi più grandi",
-  hotspots: (n: number) => `${n} rilevazioni`,
+  hotspots: (n: number) => (n === 1 ? "1 rilevazione" : `${n} rilevazioni`),
   land: {
     wildfire: "bosco o macchia",
     crop_burning: "campi (bruciatura agricola)",
@@ -95,7 +95,7 @@ const en: Text = {
     unknown: "no type",
   },
   largest: "The largest fires",
-  hotspots: (n: number) => `${n} detections`,
+  hotspots: (n: number) => (n === 1 ? "1 detection" : `${n} detections`),
   land: {
     wildfire: "forest or scrub",
     crop_burning: "fields (crop burning)",
