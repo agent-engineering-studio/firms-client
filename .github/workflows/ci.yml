@@ -57,6 +57,7 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --extra landcover
       - run: uv run --no-sync python -m benchmarks.run --check
+      - run: uv run --no-sync python -m benchmarks.faithful score --check
 
   # The card for the Developers Italia catalogue, checked by its official parser.
   publiccode:

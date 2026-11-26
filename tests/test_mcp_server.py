@@ -4,7 +4,7 @@ import asyncio
 import json
 import subprocess
 import sys
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Iterator
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -169,6 +169,11 @@ def test_the_server_lists_its_tools_and_resources() -> None:
         "area_digest",
         "export_geojson",
         "season_anomaly",
+        "fires_in_area",
+        "event_facts",
+        "trust_at",
+        "detection_odds",
+        "check_answer",
     ]
     assert resources == ["firms://guide", "firms://attribution"]
     assert "presence-only" in guide and "near-real-time rows have no" in guide
@@ -270,3 +275,98 @@ def test_season_digest_and_tool() -> None:
     assert result.structured_content["year"] == 2025
     with pytest.raises(ToolError, match="month"):
         call(server, "season_anomaly", {"country": "Italy", "year": 2025, "month": 13})
+
+
+class _Land:
+    def shares(self, latitude: float, longitude: float, radius_m: float) -> dict[int, float]:
+        return {10: 1.0}
+
+    def __enter__(self) -> _Land:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+
+@pytest.fixture
+def land(monkeypatch: pytest.MonkeyPatch) -> None:
+    import contextlib
+
+    @contextlib.contextmanager
+    def fake(enabled: bool) -> Iterator[_Land | None]:
+        yield _Land() if enabled else None
+
+    monkeypatch.setattr(m, "_land", fake)
+
+
+ITALY = [6.0, 36.0, 19.0, 47.6]
+
+
+def test_fires_in_area_answers_as_facts(land: None) -> None:
+    found = run(lambda c: m.fires_in_area(c, "Italy", 2025, ITALY, land_cover=True))
+    assert found["measured"] is True and found["detections"] == 24
+    assert found["window"] == {"start": "2025-01-01", "end": "2025-12-31"}
+    assert found["sources"][0].endswith("viirs-snpp_2025_Italy.csv")
+    assert found["largest_events"][0]["land"]["kind"] == "wildfire"
+
+
+def test_fires_in_area_without_an_archive_is_not_measured() -> None:
+    found = run(lambda c: m.fires_in_area(c, "Italy", 2019, ITALY))
+    assert found["measured"] is False and found["fires"] is None
+    assert "English name" in found["not_measured_because"]
+    with pytest.raises(ValueError, match="inside 2019"):
+        run(lambda c: m.fires_in_area(c, "Italy", 2019, ITALY, start=date(2018, 1, 1)))
+
+
+def test_event_facts_for_the_largest_event(land: None) -> None:
+    places = [{"name": "Bienno", "latitude": 45.93, "longitude": 10.29, "kind": "comune"}]
+    found = run(lambda c: m.event_facts(c, "Italy", 2025, ITALY, places=places))
+    assert found["answer"] == "event" and found["land_cover"]["kind"] == "wildfire"
+    assert found["nearest_places"][0]["name"] == "Bienno"
+    with pytest.raises(FirmsError, match="presence-only"):
+        run(lambda c: m.event_facts(c, "Italy", 2025, [12.0, 42.0, 12.1, 42.1]))
+
+
+def test_trust_at_and_land_cover_needs_its_extra(
+    land: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    found = run(lambda c: m.trust_at(c, 45.97, 10.28))
+    assert found["measured"] is True and found["reliability"]["score"] == 1.0
+    bare = run(lambda c: m.trust_at(c, 45.97, 10.28, land_cover=False))
+    assert bare["measured"] is False
+
+
+def test_the_land_helper_explains_the_missing_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib.util
+
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
+    with pytest.raises(FirmsError, match="landcover extra"), m._land(True):
+        pass
+    with m._land(False) as nothing:
+        assert nothing is None
+
+
+def test_the_facts_tools_through_the_server(land: None) -> None:
+    server = m.build_server(TRANSPORT)
+    odds = call(server, "detection_odds", {"area_ha": 542}).structured_content
+    assert odds["size_class"]["from_ha"] == 300.0
+    checked = call(
+        server,
+        "check_answer",
+        {"text": f"FIRMS saw {odds['seen']} of {odds['perimeters'] + 1}.", "answer_facts": odds},
+    ).structured_content
+    assert checked["faithful"] is False and checked["not_in_facts"] == [str(odds["perimeters"] + 1)]
+    area = call(server, "fires_in_area", {"country": "Italy", "year": 2025, "bbox": ITALY})
+    assert area.structured_content["fires"] is not None
+    trust = call(server, "trust_at", {"latitude": 45.97, "longitude": 10.28})
+    assert trust.structured_content["measured"] is True
+    event = call(server, "event_facts", {"country": "Italy", "year": 2025, "bbox": ITALY})
+    assert event.structured_content["answer"] == "event"
+    with pytest.raises(ToolError, match="latitude"):
+        call(server, "trust_at", {"latitude": 95, "longitude": 10})
+
+
+def test_area_digest_with_land_cover(land: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(ENV_MAP_KEY, "KEY")
+    digest = run(lambda c: m.area_digest(c, "KEY", NORTH, land_cover=True))
+    assert all("land" in e for e in digest["events"]["largest"])

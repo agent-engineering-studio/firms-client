@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Answers as data (`firms_client.facts`): `area`, `place`, `event` and
+  `seen` return JSON-ready dicts with every number next to its window,
+  product, sources, licence (NASA FIRMS; ESA WorldCover CC BY 4.0 when the
+  land was read) and notes. Nothing read is `measured: false` with null
+  counts, never 0.
+- `check_text(text, facts, lang=, question=)` (`firms_client.check`): the
+  numbers of a text, English or Italian, that no figure of the facts gives.
+- MCP: `fires_in_area`, `event_facts`, `trust_at`, `detection_odds`,
+  `check_answer`, and `area_digest(..., land_cover=True)` (#19).
+- `benchmarks/faithful.json` and `python -m benchmarks.faithful score
+  --check` in CI (`make faithful`): nine questions on the benchmark crops,
+  a faithful and a faulty hand answer each.
+- The site publishes `llms-full.txt` (llms.txt, README and skill); the
+  skill `skills/firms-client/SKILL.md` carries the traps.
+
 ## [0.7.0] - 2026-11-25
 
 ### Added
