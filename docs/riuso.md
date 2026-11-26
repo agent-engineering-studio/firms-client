@@ -5,11 +5,8 @@ i fuochi attivi visti dai satelliti, e li rende usabili da chiunque. Questa
 pagina è per un ente che vuole usarlo: che cosa trova pronto, che cosa resta a
 lui, e come il progetto entra nel Catalogo del software di Developers Italia.
 
-> **Prima versione.** Oggi firms-client è una libreria Python con riga di
-> comando e un server MCP. La pagina per il sito del Comune, da installare con
-> Docker, è in lavorazione
-> ([roadmap, fase 6](https://github.com/agent-engineering-studio/firms-client/issues/26)):
-> questa pagina crescerà con lei.
+firms-client è una libreria Python con riga di comando e un server MCP, e
+una **pagina per il sito del Comune** che si installa con Docker.
 
 ## Che cosa trova pronto
 
@@ -27,6 +24,68 @@ lui, e come il progetto entra nel Catalogo del software di Developers Italia.
   passati, e se a bruciare sono **campi o bosco**.
 - Un **server MCP** perché un assistente AI risponda con i numeri dei dati,
   citando la fonte.
+- Una **pagina per il sito del Comune**, con Bootstrap Italia, in italiano e
+  in inglese: i fuochi visti negli ultimi giorni e in ogni anno d'archivio
+  nell'area del Comune, quanto fidarsi di una rilevazione in un punto, e
+  «Non è un'allerta» sempre in vista.
+- Quattro **notebook**: la storia nazionale degli incendi, una stagione
+  contro le altre, quanto fidarsi, i dati per cella per un modello.
+
+## Installare la pagina per un Comune
+
+Serve una macchina con Docker (Linux, 2 GB di RAM, qualche GB di disco) e il
+repository:
+
+```bash
+git clone https://github.com/agent-engineering-studio/firms-client.git
+cd firms-client
+cp .env.example .env
+```
+
+Nel file `.env` l'ente scrive:
+
+- **il Comune**: `FIRMS_UI_LAT` e `FIRMS_UI_LON` (gradi decimali, il centro
+  del territorio), `FIRMS_UI_PLACE` (il nome nell'intestazione),
+  `FIRMS_UI_RADIUS_KM` (il raggio dell'area, da 1 a 30 km, 10 se vuoto);
+- **la lingua**: `FIRMS_UI_LANG=it` o `en` (chi visita può cambiarla);
+- **il MAP_KEY**, se vuole gli ultimi giorni: `FIRMS_MAP_KEY`, oppure un file
+  di una riga in `./secrets/map_key`, montato in sola lettura. Senza chiave
+  la pagina mostra solo gli archivi annuali e lo dice: gli ultimi giorni sono
+  «non misurati», non zero;
+- **chi può incorporarla**: `FIRMS_UI_FRAME_ANCESTORS`, per esempio
+  `"https://www.comune.esempio.it"`.
+
+Poi:
+
+```bash
+docker compose up -d        # la pagina su http://127.0.0.1:3005
+docker compose logs -f api  # il primo avvio scarica gli archivi e la copertura del suolo
+```
+
+Al primo avvio l'API scarica gli archivi del paese (per l'Italia circa 2 MB
+l'anno) e le tessere ESA WorldCover dell'area (circa 60 MB l'una), una volta
+sola, nel volume `firms-data`. Agli avvii successivi la pagina risponde
+subito.
+
+**Pubblicarla.** Le porte ascoltano solo su 127.0.0.1: davanti serve un proxy
+con HTTPS (nginx, Caddy, Traefik) che inoltri a `127.0.0.1:3005`. La pagina
+non ha account, né cookie, né moduli: è di sola lettura.
+
+**Incorporarla nel sito del Comune** con un iframe; `embed=1` toglie
+l'intestazione, `lat` e `lon` aprono la pagina su un punto e dicono quanto
+fidarsi di una rilevazione lì:
+
+```html
+<iframe src="https://fuochi.comune.esempio.it/?embed=1&lang=it"
+        title="Fuochi visti dal satellite" width="100%" height="640"></iframe>
+```
+
+**La mappa di sfondo** è OpenStreetMap, che vede l'indirizzo di chi visita.
+Un ente che ha le sue tessere le indica con `FIRMS_UI_TILES` e
+`FIRMS_UI_TILES_CREDIT`.
+
+**Aggiornarla**: `git pull && docker compose up -d --build`. I dati restano
+nel volume.
 
 ## Che cosa resta all'ente
 
@@ -52,7 +111,13 @@ Il progetto dà il software. Queste cose sono di chi lo usa.
   repository, in una variabile d'ambiente (`FIRMS_MAP_KEY`) o in un segreto di
   Docker. Gli archivi annuali non lo richiedono.
 - **Dati personali.** Il software non ne raccoglie: niente account, niente
-  cookie. Su disco restano solo gli archivi scaricati e la maschera calcolata.
+  cookie. Su disco restano solo gli archivi scaricati, la maschera calcolata e
+  le tessere della copertura del suolo. Il proxy davanti alla pagina scrive i
+  suoi log di accesso: la loro conservazione è dell'ente.
+- **Copertura del suolo.** Dove la pagina dice che cosa è bruciato (campi o
+  bosco) usa ESA WorldCover, licenza CC BY 4.0: la pagina ne riporta il
+  credito, e lo deve riportare chi ripubblica quei risultati. È una stima dal
+  suolo, non la causa dell'incendio.
 
 ## Intelligenza artificiale
 
@@ -78,7 +143,7 @@ di Developers Italia, e `codiceIPA` prende il codice dell'ente.
 - [x] Repository pubblico, licenza Apache-2.0
 - [x] README, documentazione, `CONTRIBUTING.md`, `CHANGELOG.md`
 - [x] `publiccode.yml` valido per il validatore ufficiale, controllato a ogni modifica dalla CI
-- [ ] Installazione con Docker e pagina per il Comune con Bootstrap Italia
+- [x] Installazione con Docker e pagina per il Comune con Bootstrap Italia
 - [ ] Segnalazione su `italia/catalogo-software`
 
 ## Fonti

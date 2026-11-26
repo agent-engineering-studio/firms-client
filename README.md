@@ -33,6 +33,7 @@ One dependency: `httpx`. Website: **[agentengineering.it/firms-client](https://a
 - [What this library does](#what-this-library-does)
 - [Who is it for](#who-is-it-for)
 - [Quick start](#quick-start)
+- [The page of a Comune, with Docker](#the-page-of-a-comune-with-docker)
 - [Where downloads are saved](#where-downloads-are-saved)
 - [Not every hotspot is a fire](#not-every-hotspot-is-a-fire)
 - [How it works](#how-it-works)
@@ -257,6 +258,56 @@ instructions and the `firms://guide` resource carry the traps (type,
 presence-only, no `type` in near-real-time data) and `firms://attribution`
 carries the NASA acknowledgement. Ask it *"how did the 2021 fire season in
 Sicily compare with 2025?"*: it calls `fire_history` with Sicily's bbox.
+
+---
+
+## The page of a Comune, with Docker
+
+For a Comune that wants the fires on its own site, with nothing to install
+but Docker:
+
+```bash
+cp .env.example .env     # the Comune: FIRMS_UI_LAT, FIRMS_UI_LON, FIRMS_UI_PLACE
+docker compose up -d     # the page: http://127.0.0.1:3005
+```
+
+The page reads one area around the Comune (`FIRMS_UI_RADIUS_KM`, 10 km by
+default) and shows, in Italian or English, with Bootstrap Italia:
+
+- the fires of the **last 7 days**, from the area API, when `.env` has a
+  `FIRMS_MAP_KEY`. Without a key the page shows the yearly archives only,
+  and says so: the last days are *not measured*, not zero;
+- the fires of **each archive year** in the area, the largest of them and
+  what land burnt (ESA WorldCover), and a bar per year;
+- **how far to trust** a detection at any point clicked (`facts.place`);
+- «Non è un'allerta» / «Not an alert» always in view, the presence-only
+  note, and the NASA and ESA credits.
+
+At startup the API downloads the archives of the country (Italy: about 2 MB a
+year) and the WorldCover tiles of the area (about 60 MB each), once, into the
+volume `firms-data`. The ports listen on 127.0.0.1 only: publish the page
+through a proxy with HTTPS. `FIRMS_UI_FRAME_ANCESTORS` lets the Comune's site
+show it in an iframe (`?embed=1` drops the header). Every answer of the API
+(`demo/api.py`, `/api/health`, `/api/season`, `/api/recent`, `/api/history`,
+`/api/trust`) is a `facts` answer.
+
+The MAP_KEY comes from `.env` or from a file in `./secrets` mounted
+read-only (`FIRMS_MAP_KEY_NAME`); it is never copied into an image, and
+never written to a log or an answer (a test checks both).
+
+Two more containers, on request:
+
+```bash
+docker compose --profile notebook up -d   # JupyterLab on the notebooks: http://127.0.0.1:8890
+docker compose --profile mcp up -d        # the MCP server over HTTP: http://127.0.0.1:8769/mcp
+docker compose run --rm cli --help        # the command line
+```
+
+`make up`, `make demo`, `make down` and `make logs` do the same. The
+notebooks are in [`notebooks/`](notebooks/README.md): a national fire
+history, one season against the others, how much to trust a detection, and
+per-cell features for a model. Installing it for a Comune, licences
+included: [`docs/riuso.md`](docs/riuso.md).
 
 ---
 
