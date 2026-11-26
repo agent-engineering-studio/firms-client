@@ -43,7 +43,7 @@ function Counts({ t, facts }: { t: Text; facts: AreaFacts }) {
           </dd>
         </div>
       </dl>
-      {facts.by_type && (
+      {facts.by_type && Object.values(facts.by_type).some((n) => n > 0) && (
         <p className="firms-small">
           {t.byType}:{" "}
           {Object.entries(facts.by_type)

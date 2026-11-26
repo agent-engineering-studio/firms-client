@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The page: «1 rilevazione» / «1 detection» in the singular, and no empty
+  «Che cosa era caldo» line when nothing was seen.
+- Screenshots of the page in the README and in `publiccode.yml`.
+
 ## [0.9.0] - 2026-11-26
 
 ### Added
