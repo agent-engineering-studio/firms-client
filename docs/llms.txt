@@ -77,6 +77,19 @@ Key facts an assistant must get right:
 - On the EFFIS benchmark, fires on 90 % agricultural land read 0.58-0.86 of cropland, wildfires 0-0.004: WorldCover calls pasture grassland, so `cropland` is low for an agricultural fire, never high for a wildfire.
 - CLI: `firms cells Italy 2024 [2025] [--bbox W,S,E,N] [--mask] [--land] [--size-m 1000] [--format csv|json]`.
 
+## For an application with its own HTTP layer and database
+
+Pure functions (0.10.0), so an application keeps only its requests, its retries and its tables. No network, no dependency beyond the core.
+
+- `read_csv(text, *, mask=None, vegetation_only=True, min_confidence="nominal", min_confidence_pct=None, min_frp_mw=0.0)` -> `CsvReading` (`hotspots`, `rows`, `malformed`, property `dropped`): `parse_csv`, then `mask.label`, then `select`, with the count of the rows not kept (log it: a changed CSV format is otherwise silent). `vegetation_only=False` keeps `type` on every row, for whoever stores the column.
+- `area_error(status_code, text)` -> `str | None`: why an answer of the area API is not data (a bad key, a quota, an error page with HTTP 200), or `None` for a hotspot CSV or an empty body. The message `fetch_area` raises.
+- `ArchiveProduct.sp_source` -> `"MODIS_SP"` / `"VIIRS_SNPP_SP"`: the area API source of the same data as a country archive, to keep archive rows apart from near-real-time ones in one table.
+- `archive_years(product, *, until, first=None)`; `last_archive_year(today=None)` -> last year (the current year is not in the archives); `archive_years_complete(wanted, found)` -> `True` when at most the last year is missing (not published yet), `False` when another is (a failed download: do not save what was built); `archive_product_of(filename)` -> `ArchiveProduct | None` from a file name.
+- `static_mask_from_archives({year: csv_text}, *, country, product=VIIRS_SNPP, rules=None)` -> `StaticMask`: what `fetch_static_mask` builds, from archives already fetched; `static_mask_filename(country, first, last, product=VIIRS_SNPP)` -> `"static-mask_viirs-snpp_Italy_2012-2025.json"`.
+- `WorldCover.local(directory=None, *, year=2021)` -> `WorldCover | None`: only the tiles in the data directory, never the bucket; `None` (no tile) is not measured. `worldcover_path(url, directory=None)` -> where a tile of the bucket lives locally, under `WORLDCOVER_DIR` (`"worldcover"`).
+- `LaeaGrid.anchored(cell, south_west, *, size_m=1000.0)` -> the grid in which `cell` `(row, col)` has its south-west corner at `(x, y)` EPSG:3035: a grid stored in a table, rebuilt from one of its cells. `grid.misplaced([(cell, (lat, lon)), …])` -> the cells whose centre the grid puts elsewhere; empty when the grid is theirs.
+- `ARCHIVE_BASE`, `AREA_API_BASE`: the roots of the two services.
+
 ## The rest of the public API
 
 - Archives: `download_archive(client, product, year, country, directory=None, *, retry=None)` -> `Path | None` (the cached yearly CSV), `fetch_archive_csv(...)` -> `str | None` (its text). `ARCHIVE_PRODUCTS` lists the `ArchiveProduct(slug, first_year)` values (`MODIS` 2000, `VIIRS_SNPP` 2012). `ENV_DATA_DIR` is `"FIRMS_DATA_DIR"`.

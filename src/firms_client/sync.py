@@ -24,16 +24,22 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 from firms_client.client import default_directory, download_archive
-from firms_client.mask import fetch_static_mask
+from firms_client.mask import fetch_static_mask, static_mask_filename
 from firms_client.retry import RetryPolicy
-from firms_client.sources import VIIRS_SNPP, ArchiveProduct, BBox, archive_years
+from firms_client.sources import (
+    VIIRS_SNPP,
+    ArchiveProduct,
+    BBox,
+    archive_years,
+    last_archive_year,
+)
 
 #: The manifest :func:`sync` writes in the data directory.
 MANIFEST = "sync.json"
@@ -71,7 +77,7 @@ async def sync(
 ) -> SyncReport:
     """Download what the library would read lazily, now; see the module."""
     folder = directory or default_directory()
-    last = last_year if last_year is not None else date.today().year - 1
+    last = last_year if last_year is not None else last_archive_year()
     report = SyncReport(country=country, directory=str(folder))
     for product in products:
         for year in archive_years(product, until=last):
@@ -90,8 +96,7 @@ async def sync(
             retry=retry,
         )
         first = first_year if first_year is not None else VIIRS_SNPP.first_year
-        name = f"static-mask_{VIIRS_SNPP.slug}_{country}_{first}-{last}.json"
-        report.mask = str(folder / name)
+        report.mask = str(folder / static_mask_filename(country, first, last))
         report.mask_cells = len(mask.cells)
     if worldcover is not None:
         from firms_client.landcover import save_worldcover

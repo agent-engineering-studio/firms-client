@@ -35,7 +35,10 @@ import io
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from firms_client.mask import StaticMask
 
 ConfidenceLevel = Literal["low", "nominal", "high"]
 
@@ -185,6 +188,52 @@ def select(
             continue
         out.append(h)
     return out
+
+
+@dataclass(frozen=True, slots=True)
+class CsvReading:
+    """What :func:`read_csv` kept of a CSV, and out of how many rows."""
+
+    hotspots: list[Hotspot]
+    #: The data rows of the CSV, well formed or not.
+    rows: int
+    #: The rows :func:`parse_csv` skipped: no coordinates, date or time.
+    malformed: int
+
+    @property
+    def dropped(self) -> int:
+        """The rows not kept, malformed or below the bar: log it, or a changed format is silent."""
+        return self.rows - len(self.hotspots)
+
+
+def read_csv(
+    text: str,
+    *,
+    mask: StaticMask | None = None,
+    vegetation_only: bool = True,
+    min_confidence: ConfidenceLevel = "nominal",
+    min_confidence_pct: int | None = None,
+    min_frp_mw: float = 0.0,
+) -> CsvReading:
+    """A CSV to the detections above the quality bar, with the count of what was dropped.
+
+    :func:`parse_csv`, then ``mask.label`` (the area API has no ``type``:
+    the mask gives its rows the ``type`` of the static cell they fall in),
+    then :func:`select` with the same arguments. With
+    ``vegetation_only=False`` the ``type`` is kept on every row and nothing
+    is dropped for it: for whoever stores the column and filters later.
+    """
+    parsed = parse_csv(text)
+    rows = sum(1 for _ in csv.DictReader(io.StringIO(text)))
+    labelled = mask.label(parsed) if mask is not None else parsed
+    kept = select(
+        labelled,
+        vegetation_only=vegetation_only,
+        min_confidence=min_confidence,
+        min_confidence_pct=min_confidence_pct,
+        min_frp_mw=min_frp_mw,
+    )
+    return CsvReading(hotspots=kept, rows=rows, malformed=rows - len(parsed))
 
 
 def within(

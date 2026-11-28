@@ -1172,6 +1172,13 @@ All checked against the live service on 3 November 2026.
 | `VEGETATION_FIRE`, `ACTIVE_VOLCANO`, `STATIC_LAND_SOURCE`, `OFFSHORE` | constants | the `type` values |
 | `Hotspot`, `FireEvent`, `ArchiveProduct`, `BBox`, `ConfidenceLevel` | types | |
 | `ATTRIBUTION`, `TYPE_NAMES` | constants | the NASA acknowledgement, names for `type` |
+| `read_csv(text, *, mask, vegetation_only, min_confidence, …)` → `CsvReading` | pure | parse, label with the mask, select; with the count of the rows dropped |
+| `area_error(status_code, text)` | pure | why an area API answer is not data, or `None`: for your own HTTP layer |
+| `ArchiveProduct.sp_source`, `archive_product_of(filename)`, `last_archive_year()`, `archive_years_complete(wanted, found)` | pure | the `*_SP` source of an archive, the product of a file name, which years to ask and whether they all came |
+| `static_mask_from_archives({year: text}, *, country)`, `static_mask_filename(country, first, last)` | pure | the mask from archives you fetched yourself, and its file name |
+| `WorldCover.local(directory=None)`, `worldcover_path(url, directory=None)`, `WORLDCOVER_DIR` | pure | the local tiles and never the bucket (`None` when there is none); where a tile lives |
+| `LaeaGrid.anchored(cell, south_west, *, size_m)`, `grid.misplaced(centres)` | pure | a grid kept in a table, rebuilt from one cell and checked on a sample |
+| `ARCHIVE_BASE`, `AREA_API_BASE` | constants | the roots of the country archives and of the area API |
 | `within(hotspots, bbox)` | pure | the hotspots inside a bbox: one region of a country |
 | `cell_stats(hotspots, grid, *, cells, mask, land)` → `{cell: CellStats}` | pure | fire-days, land under the fires and distance from static sources, per cell |
 | `LaeaGrid(size_m=1000, origin=(0, 0))`, `DegreeGrid(step)`, `Grid`, `laea`, `laea_inverse` | pure | the EEA 1 km grid (ETRS89-LAEA) and degree grids, no pyproj |

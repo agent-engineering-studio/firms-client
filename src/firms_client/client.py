@@ -181,6 +181,19 @@ async def fetch_archive(
     return parse_csv(text) if text is not None else None
 
 
+def area_error(status_code: int, text: str) -> str | None:
+    """Why an answer of the area API is not data, or ``None`` when it is.
+
+    For an application that makes the request itself. A hotspot CSV with
+    HTTP 200 is data, and so is an empty body: no detection in the box. A
+    bad key or source is HTTP 400 with plain text, and an error page may
+    come with HTTP 200: both give the message :func:`fetch_area` raises.
+    """
+    if status_code == 200 and (is_hotspot_csv(text) or not text.strip()):
+        return None
+    return f"FIRMS area API (HTTP {status_code}): {text[:200].strip()}"
+
+
 async def fetch_area(
     client: httpx.AsyncClient,
     map_key: str,
@@ -205,12 +218,9 @@ async def fetch_area(
         return response
 
     response = await with_retries(retry, attempt)
-    if response.status_code != 200 or not is_hotspot_csv(response.text):
-        if response.status_code == 200 and not response.text.strip():
-            return []
-        raise FirmsError(
-            f"FIRMS area API (HTTP {response.status_code}): {response.text[:200].strip()}"
-        )
+    error = area_error(response.status_code, response.text)
+    if error is not None:
+        raise FirmsError(error)
     return parse_csv(response.text)
 
 

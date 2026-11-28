@@ -28,16 +28,22 @@ from __future__ import annotations
 import json
 import math
 from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from firms_client.client import default_directory, fetch_archive
-from firms_client.hotspots import ACTIVE_VOLCANO, OFFSHORE, STATIC_LAND_SOURCE, Hotspot
+from firms_client.hotspots import (
+    ACTIVE_VOLCANO,
+    OFFSHORE,
+    STATIC_LAND_SOURCE,
+    Hotspot,
+    parse_csv,
+)
 from firms_client.retry import RetryPolicy
-from firms_client.sources import VIIRS_SNPP, ArchiveProduct, archive_years
+from firms_client.sources import VIIRS_SNPP, ArchiveProduct, archive_years, last_archive_year
 
 if TYPE_CHECKING:
     import httpx
@@ -227,6 +233,37 @@ def build_static_mask(
     return StaticMask(cells=cells, rules=rules, known=frozenset(known), meta=dict(meta or {}))
 
 
+def static_mask_filename(
+    country: str, first: int, last: int, product: ArchiveProduct = VIIRS_SNPP
+) -> str:
+    """The name of a saved mask: ``static-mask_viirs-snpp_Italy_2012-2025.json``."""
+    return f"static-mask_{product.slug}_{country}_{first}-{last}.json"
+
+
+def static_mask_from_archives(
+    texts: Mapping[int, str],
+    *,
+    country: str,
+    product: ArchiveProduct = VIIRS_SNPP,
+    rules: MaskRules | None = None,
+) -> StaticMask:
+    """The mask from yearly archive CSVs you already have, ``{year: text}``.
+
+    What :func:`fetch_static_mask` builds, without the download: for an
+    application that fetches the archives with its own HTTP layer. Save it
+    only when :func:`~firms_client.archive_years_complete` says the years
+    are all there.
+    """
+    rows = [h for year in sorted(texts) for h in parse_csv(texts[year])]
+    meta = {
+        "country": country,
+        "product": product.slug,
+        "years": sorted(texts),
+        "detections": len(rows),
+    }
+    return build_static_mask(rows, rules, meta=meta)
+
+
 async def fetch_static_mask(
     client: httpx.AsyncClient,
     country: str,
@@ -244,11 +281,11 @@ async def fetch_static_mask(
     ``static-mask_{product}_{country}_{first}-{last}.json`` in the data
     directory and read from there afterwards; delete it to rebuild.
     """
-    last = last_year if last_year is not None else date.today().year - 1
+    last = last_year if last_year is not None else last_archive_year()
     first = first_year if first_year is not None else product.first_year
     rules = rules or MaskRules()
     folder = directory or default_directory()
-    path = folder / f"static-mask_{product.slug}_{country}_{first}-{last}.json"
+    path = folder / static_mask_filename(country, first, last, product)
     if path.exists():
         mask = StaticMask.load(path)
         if mask.rules == rules:
