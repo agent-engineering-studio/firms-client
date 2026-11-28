@@ -25,8 +25,10 @@ A key allows 5,000 transactions per 10 minutes.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
+from pathlib import PurePath
 
 ARCHIVE_BASE = "https://firms.modaps.eosdis.nasa.gov/data/country"
 AREA_API_BASE = "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
@@ -51,6 +53,15 @@ class ArchiveProduct:
     slug: str
     first_year: int
 
+    @property
+    def sp_source(self) -> str:
+        """The area API source of the same data: ``MODIS_SP``, ``VIIRS_SNPP_SP``.
+
+        The country archives are standard processing: stored next to
+        near-real-time rows, this name keeps the two products apart.
+        """
+        return f"{self.slug.upper().replace('-', '_')}_SP"
+
 
 MODIS = ArchiveProduct(slug="modis", first_year=2000)
 VIIRS_SNPP = ArchiveProduct(slug="viirs-snpp", first_year=2012)
@@ -67,9 +78,41 @@ def archive_url(product: ArchiveProduct, year: int, country: str) -> str:
     return f"{ARCHIVE_BASE}/{product.slug}/{year}/{archive_filename(product, year, country)}"
 
 
-def archive_years(product: ArchiveProduct, *, until: int) -> list[int]:
-    """The years worth asking for, from the product's first."""
-    return list(range(product.first_year, until + 1))
+def archive_years(product: ArchiveProduct, *, until: int, first: int | None = None) -> list[int]:
+    """The years worth asking for, from the product's first (or ``first``, if later)."""
+    start = product.first_year if first is None else max(first, product.first_year)
+    return list(range(start, until + 1))
+
+
+def last_archive_year(today: date | None = None) -> int:
+    """The last year worth asking the archives for: last year.
+
+    The current year is not in the country archives; the area API covers it.
+    FIRMS may publish last year late: :func:`~firms_client.latest_archive`
+    asks the service what is really there.
+    """
+    return (today or date.today()).year - 1
+
+
+def archive_years_complete(wanted: Iterable[int], found: Iterable[int]) -> bool:
+    """True when no year of ``wanted`` is missing from ``found``, but at most the last.
+
+    The last year may not be published yet, and what is built without it is
+    whole. Any other missing year is a download that failed: what is built
+    from the rest (a static mask) is not worth keeping for a year.
+    """
+    years = set(wanted)
+    return not years or years - set(found) <= {max(years)}
+
+
+def archive_product_of(filename: str) -> ArchiveProduct | None:
+    """The product of an archive file, from its name: ``viirs-snpp_2025_Italy.csv``.
+
+    A yearly CSV does not say which product it is; its name does. ``None``
+    when the name starts with no product's slug.
+    """
+    name = PurePath(filename).name.lower()
+    return next((p for p in ARCHIVE_PRODUCTS if name.startswith(p.slug)), None)
 
 
 def area_url(

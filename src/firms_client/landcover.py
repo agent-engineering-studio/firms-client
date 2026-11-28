@@ -222,6 +222,18 @@ class WorldCover:
         local = (directory or default_directory()) / WORLDCOVER_DIR
         return cls(str(local) if local.is_dir() else WORLDCOVER_URL, year=year)
 
+    @classmethod
+    def local(cls, directory: Path | None = None, *, year: int = 2021) -> WorldCover | None:
+        """The tiles in the data directory and nothing else; ``None`` when there is none.
+
+        For a server that must not reach the bucket: unlike :meth:`synced`,
+        it never falls back to it, and ``None`` is *not measured*. The tiles
+        are those of :func:`~firms_client.init` or :func:`save_worldcover`,
+        in ``worldcover/`` under ``directory``.
+        """
+        folder = (directory or default_directory()) / WORLDCOVER_DIR
+        return cls(str(folder), year=year) if any(folder.rglob("*.tif")) else None
+
     def tile(self, latitude: float, longitude: float) -> str:
         """The tile file of a position: ``…_N36E012_Map.tif`` covers 36-39 N, 12-15 E."""
         south = math.floor(latitude / 3) * 3

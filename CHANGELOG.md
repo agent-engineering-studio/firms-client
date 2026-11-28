@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-28
+
+### Added
+
+What an application with its own HTTP layer and database still computed by
+hand, as pure functions of the core (no new dependency). Each is tested
+against the code it replaces in Limen, frozen in `tests/limen_frozen.py`.
+
+- `read_csv(text, *, mask, vegetation_only, min_confidence,
+  min_confidence_pct, min_frp_mw)` → `CsvReading` (`hotspots`, `rows`,
+  `malformed`, `dropped`): parse, label with the static mask, select, and
+  the count of the rows not kept.
+- `area_error(status_code, text)`: why an answer of the area API is not
+  data, or `None`; `fetch_area` uses it.
+- `ArchiveProduct.sp_source` (`MODIS_SP`, `VIIRS_SNPP_SP`),
+  `archive_product_of(filename)`, `last_archive_year(today=None)`,
+  `archive_years_complete(wanted, found)`, and `archive_years(...,
+  first=)`.
+- `static_mask_from_archives({year: text}, *, country, product, rules)` and
+  `static_mask_filename(country, first, last, product)`.
+- `WorldCover.local(directory=None, *, year=2021)`: the local tiles and
+  never the bucket; `None` when there is none.
+- `LaeaGrid.anchored(cell, south_west, *, size_m)` and
+  `LaeaGrid.misplaced(centres)`: a grid stored elsewhere, rebuilt from one
+  cell and checked on a sample.
+- `worldcover_path`, `WORLDCOVER_DIR`, `ARCHIVE_BASE` and `AREA_API_BASE`
+  are public names of the package (they were importable from its modules).
+
 ### Fixed
 
 - The page: «1 rilevazione» / «1 detection» in the singular, and no empty

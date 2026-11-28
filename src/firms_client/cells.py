@@ -155,6 +155,33 @@ class LaeaGrid:
     size_m: float = 1000.0
     origin: tuple[float, float] = (0.0, 0.0)
 
+    @classmethod
+    def anchored(
+        cls, cell: tuple[int, int], south_west: tuple[float, float], *, size_m: float = 1000.0
+    ) -> LaeaGrid:
+        """The grid in which ``cell`` ``(row, col)`` has its south-west corner at ``south_west``.
+
+        ``south_west`` is ``(x, y)`` in EPSG:3035 metres. For a grid kept
+        somewhere else (a table of cells): one stored cell gives the origin,
+        and :meth:`misplaced` checks it on a sample of the others.
+        """
+        row, col = cell
+        return cls(
+            size_m=size_m, origin=(south_west[0] - col * size_m, south_west[1] - row * size_m)
+        )
+
+    def misplaced(
+        self, centres: Iterable[tuple[tuple[int, int], tuple[float, float]]]
+    ) -> list[tuple[int, int]]:
+        """The cells whose centre ``(latitude, longitude)`` this grid puts in another cell.
+
+        ``centres`` are ``(cell, (latitude, longitude))`` pairs of a stored
+        grid. Empty when the grid is theirs; anything else is a grid of
+        another step or origin, and per-cell statistics would go to the
+        wrong cells.
+        """
+        return [cell for cell, (lat, lon) in centres if self.cell_of(lat, lon) != cell]
+
     def cell_of(self, latitude: float, longitude: float) -> tuple[int, int]:
         x, y = laea(latitude, longitude)
         return (

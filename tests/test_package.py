@@ -22,6 +22,7 @@ FORBIDDEN = {
     "ingv_shakemap",
     "imageserver_export",
     "mcp_geo_server",
+    "limen_core",
 }
 
 
